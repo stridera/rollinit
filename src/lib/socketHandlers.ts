@@ -501,10 +501,24 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
   socket.on("combat:rollInitiative", async (data) => {
     const instance = await prisma.encounterCombatant.findUnique({
       where: { id: data.instanceId },
-      include: { encounter: true },
+      include: { encounter: true, combatant: true },
     });
 
     if (!instance) return;
+
+    // Authorization: non-DM sockets can only roll for their own combatant
+    const isDM = socket.rooms.has(`dm:${data.joinCode}`);
+    if (!isDM) {
+      if (instance.combatant.playerSocketId !== socket.id) {
+        socket.emit("error", "You can only roll initiative for your own character");
+        return;
+      }
+      // Players cannot set manual values
+      if (data.value !== undefined) {
+        socket.emit("error", "Only the DM can set manual initiative values");
+        return;
+      }
+    }
 
     const roll = data.value ?? Math.floor(Math.random() * 20) + 1;
     const total = roll + instance.initiativeBonus;

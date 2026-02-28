@@ -392,6 +392,7 @@ export function PlayerView({ joinCode }: { joinCode: string }) {
             isDM={false}
             joinCode={joinCode}
             emit={emit}
+            playerCombatantId={combatantId}
           />
         )}
 

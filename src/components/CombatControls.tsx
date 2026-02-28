@@ -60,18 +60,20 @@ export function CombatControls({
             </span>
           </div>
           <div className="flex gap-2">
-            <button
-              onClick={() =>
-                emit("combat:rollAll", {
-                  joinCode,
-                  encounterId: encounter.id,
-                })
-              }
-              className="btn btn-secondary flex-1"
-            >
-              <Dice6 size={16} />
-              Roll All Remaining
-            </button>
+            {!allRolled && (
+              <button
+                onClick={() =>
+                  emit("combat:rollAll", {
+                    joinCode,
+                    encounterId: encounter.id,
+                  })
+                }
+                className="btn btn-secondary flex-1"
+              >
+                <Dice6 size={16} />
+                Roll All Remaining
+              </button>
+            )}
             <button
               onClick={() =>
                 emit("combat:start", {
