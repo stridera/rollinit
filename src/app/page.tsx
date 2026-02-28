@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Crown, LogIn, Github } from "lucide-react";
+import { D20Icon } from "@/components/D20Icon";
 
 export default function Home() {
   const router = useRouter();
@@ -46,9 +48,30 @@ export default function Home() {
 
   return (
     <div className="min-h-dvh flex items-center justify-center p-4 relative z-10">
-      <div className="w-full max-w-md space-y-8">
+      {/* Viewport vignette */}
+      <div
+        className="fixed inset-0 pointer-events-none z-0"
+        style={{
+          background:
+            "radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.5) 100%)",
+        }}
+      />
+
+      <div className="w-full max-w-md space-y-8 relative">
+        {/* Floating particles */}
+        <div className="particle particle-1" />
+        <div className="particle particle-2" />
+        <div className="particle particle-3" />
+        <div className="particle particle-4" />
+
         {/* Logo / Title */}
-        <div className="text-center space-y-2">
+        <div className="text-center space-y-3">
+          <div className="flex justify-center">
+            <D20Icon
+              size={80}
+              className="text-accent-gold drop-shadow-[0_0_20px_rgba(212,168,67,0.3)] hover:rotate-12 transition-transform duration-700"
+            />
+          </div>
           <h1 className="text-5xl tracking-wide">RollInit</h1>
           <p className="text-text-secondary text-sm tracking-widest uppercase">
             Initiative Tracker & Dice Roller
@@ -56,7 +79,7 @@ export default function Home() {
         </div>
 
         {/* Create Session */}
-        <div className="card space-y-4">
+        <div className="card space-y-4 border-t-2 border-t-accent-gold/40 shadow-[inset_0_1px_12px_rgba(212,168,67,0.04)]">
           <h2 className="text-xl">Dungeon Master</h2>
           <p className="text-text-secondary text-sm">
             Create a new session and invite your players with a join code.
@@ -71,22 +94,22 @@ export default function Home() {
                 <Spinner /> Creating...
               </span>
             ) : (
-              "Create Session"
+              <span className="flex items-center justify-center gap-2">
+                <Crown size={20} /> Create Session
+              </span>
             )}
           </button>
         </div>
 
-        {/* Divider */}
+        {/* Ornamental divider */}
         <div className="flex items-center gap-4">
-          <div className="flex-1 h-px bg-border" />
-          <span className="text-text-muted text-xs uppercase tracking-wider">
-            or
-          </span>
-          <div className="flex-1 h-px bg-border" />
+          <div className="flex-1 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+          <span className="text-accent-gold/40 text-sm select-none">{"\u25C6"}</span>
+          <div className="flex-1 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
         </div>
 
         {/* Join Session */}
-        <div className="card space-y-4">
+        <div className="card space-y-4 border-t-2 border-t-accent-gold/40 shadow-[inset_0_1px_12px_rgba(212,168,67,0.04)]">
           <h2 className="text-xl">Player</h2>
           <p className="text-text-secondary text-sm">
             Enter the code your DM shared to join the session.
@@ -114,15 +137,29 @@ export default function Home() {
                   <Spinner /> Joining...
                 </span>
               ) : (
-                "Join Session"
+                <span className="flex items-center justify-center gap-2">
+                  <LogIn size={18} /> Join Session
+                </span>
               )}
             </button>
           </form>
         </div>
 
-        <p className="text-center text-text-muted text-xs">
-          No account needed. Bookmark your DM link to return later.
-        </p>
+        {/* Footer */}
+        <div className="text-center space-y-1">
+          <p className="text-text-muted text-xs">
+            No account needed. Bookmark your DM link to return later.
+          </p>
+          <a
+            href="https://github.com/stridera/rollinit/issues"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-text-muted text-xs hover:text-text-secondary transition-colors"
+          >
+            <Github size={12} />
+            Found a bug? Open an issue
+          </a>
+        </div>
       </div>
     </div>
   );

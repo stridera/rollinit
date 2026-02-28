@@ -1,14 +1,36 @@
 "use client";
 
-import { useState, useEffect, type Dispatch, type SetStateAction } from "react";
+import { useState, useEffect, useRef, type Dispatch, type SetStateAction } from "react";
+import type { LucideProps } from "lucide-react";
+import {
+  Triangle,
+  Dice6,
+  Octagon,
+  Diamond,
+  Pentagon,
+  Hexagon,
+  Circle,
+} from "lucide-react";
 import type { DiceRoll } from "@prisma/client";
 import type { SessionState, ClientToServerEvents } from "@/types/socket";
 import type { AppSocket } from "@/lib/socketClient";
+import { DICE_CONFIG, isNat20, isNat1 } from "@/lib/diceConfig";
+import { DiceSpotlight } from "./DiceSpotlight";
 
 type EmitFn = <E extends keyof ClientToServerEvents>(
   event: E,
   ...args: Parameters<ClientToServerEvents[E]>
 ) => void;
+
+const ICON_MAP: Record<string, React.ComponentType<LucideProps>> = {
+  Triangle,
+  Dice6,
+  Octagon,
+  Diamond,
+  Pentagon,
+  Hexagon,
+  Circle,
+};
 
 const DICE_TYPES = [
   { label: "d4", sides: 4 },
@@ -37,6 +59,13 @@ export function DiceRoller({
 }) {
   const [notation, setNotation] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
+  const [spotlight, setSpotlight] = useState<{
+    total: number;
+    isNat20: boolean;
+    isNat1: boolean;
+    dieColor: string;
+  } | null>(null);
+  const spotlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Listen for dice results
   useEffect(() => {
@@ -45,17 +74,38 @@ export function DiceRoller({
     function onDiceResult(roll: DiceRoll) {
       setSessionState((prev) => {
         if (!prev) return prev;
-        // Avoid duplicates
         if (prev.diceRolls.some((r) => r.id === roll.id)) return prev;
         return { ...prev, diceRolls: [roll, ...prev.diceRolls].slice(0, 50) };
       });
+
+      // Show spotlight for this user's rolls
+      if (roll.rollerName === rollerName) {
+        const nat20 = isNat20(roll.notation, roll.rolls);
+        const nat1 = isNat1(roll.notation, roll.rolls);
+        const dieMatch = roll.notation.match(/d(\d+)/i);
+        const dieKey = dieMatch ? `d${dieMatch[1]}` : "d20";
+        const config = DICE_CONFIG[dieKey] ?? DICE_CONFIG.d20;
+
+        setSpotlight({
+          total: roll.total,
+          isNat20: nat20,
+          isNat1: nat1,
+          dieColor: config.color,
+        });
+
+        if (spotlightTimer.current) clearTimeout(spotlightTimer.current);
+        spotlightTimer.current = setTimeout(
+          () => setSpotlight(null),
+          nat20 || nat1 ? 2500 : 1500
+        );
+      }
     }
 
     socket.on("dice:result", onDiceResult);
     return () => {
       socket.off("dice:result", onDiceResult);
     };
-  }, [socket, setSessionState]);
+  }, [socket, setSessionState, rollerName]);
 
   function handleRoll(diceNotation: string) {
     if (!diceNotation.trim()) return;
@@ -74,20 +124,45 @@ export function DiceRoller({
   }
 
   return (
-    <div className="card space-y-4">
+    <div className="card space-y-4 relative overflow-hidden">
+      {spotlight && <DiceSpotlight {...spotlight} />}
+
       <h3 className="text-lg">Dice Roller</h3>
 
-      {/* Quick dice buttons */}
-      <div className="flex flex-wrap gap-2">
-        {DICE_TYPES.map((d) => (
-          <button
-            key={d.label}
-            onClick={() => handleRoll(d.label)}
-            className="btn btn-secondary btn-sm text-xs"
-          >
-            {d.label}
-          </button>
-        ))}
+      {/* Color-coded dice buttons */}
+      <div className="flex gap-1.5 items-end justify-center">
+        {DICE_TYPES.map((d) => {
+          const config = DICE_CONFIG[d.label];
+          const IconComponent = ICON_MAP[config.icon];
+          const isD20 = d.label === "d20";
+          const isD100 = d.label === "d100";
+
+          return (
+            <button
+              key={d.label}
+              onClick={() => handleRoll(d.label)}
+              className="flex flex-col items-center gap-0.5 rounded-lg border-2 transition-all hover:scale-105 active:scale-95"
+              style={{
+                borderColor: config.color,
+                background: `color-mix(in srgb, ${config.color} 8%, transparent)`,
+                padding: isD20 ? "0.5rem 0.6rem" : "0.35rem 0.45rem",
+              }}
+              title={`Roll ${d.label}`}
+            >
+              <IconComponent
+                size={isD20 ? 24 : isD100 ? 16 : 18}
+                className="transition-colors"
+                color={config.color}
+              />
+              <span
+                className={`font-bold ${isD100 ? "text-[10px]" : "text-xs"}`}
+                style={{ color: config.color }}
+              >
+                {d.label}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Notation input */}

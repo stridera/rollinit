@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { Ghost, User, Plus } from "lucide-react";
 import type { CombatantType } from "@prisma/client";
 import type { ClientToServerEvents } from "@/types/socket";
 import { SRD_MONSTERS, type SrdMonster } from "@/data/srd-monsters";
@@ -84,23 +85,25 @@ export function AddCombatantForm({
       {/* Tabs */}
       <div className="flex gap-1 bg-bg-tertiary rounded-lg p-1">
         <button
-          className={`flex-1 py-1.5 px-3 rounded-md text-sm transition-colors ${
+          className={`flex-1 py-1.5 px-3 rounded-md text-sm transition-colors flex items-center justify-center gap-1.5 ${
             tab === "MONSTER"
               ? "bg-bg-card text-accent-gold"
               : "text-text-muted hover:text-text-secondary"
           }`}
           onClick={() => setTab("MONSTER")}
         >
+          <Ghost size={14} />
           Monster
         </button>
         <button
-          className={`flex-1 py-1.5 px-3 rounded-md text-sm transition-colors ${
+          className={`flex-1 py-1.5 px-3 rounded-md text-sm transition-colors flex items-center justify-center gap-1.5 ${
             tab === "PLAYER_CHARACTER"
               ? "bg-bg-card text-accent-gold"
               : "text-text-muted hover:text-text-secondary"
           }`}
           onClick={() => setTab("PLAYER_CHARACTER")}
         >
+          <User size={14} />
           Player Character
         </button>
       </div>
@@ -189,6 +192,7 @@ export function AddCombatantForm({
         </div>
 
         <button type="submit" className="btn btn-primary w-full">
+          <Plus size={18} />
           Add {tab === "MONSTER" ? "Monster" : "Character"}
         </button>
       </form>

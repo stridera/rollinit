@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Pencil, Check, Trash2, Swords, CheckCircle, Eye } from "lucide-react";
 import type { CombatantWithInstances, ClientToServerEvents } from "@/types/socket";
 import type { EncounterStatus } from "@prisma/client";
 import { HpTracker } from "./HpTracker";
@@ -18,6 +19,7 @@ export function CombatantList({
   activeEncounterId,
   activeEncounterStatus,
   activeEncounterCombatantIds,
+  viewerCount,
 }: {
   combatants: CombatantWithInstances[];
   joinCode: string;
@@ -26,6 +28,7 @@ export function CombatantList({
   activeEncounterId?: string | null;
   activeEncounterStatus?: EncounterStatus | null;
   activeEncounterCombatantIds?: Set<string>;
+  viewerCount?: { spectators: number; players: number } | null;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -45,12 +48,20 @@ export function CombatantList({
 
   return (
     <div className="space-y-4">
-      <h3 className="text-lg">
-        Combatants{" "}
-        <span className="text-text-muted text-sm font-normal">
-          ({combatants.length})
-        </span>
-      </h3>
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg">
+          Combatants{" "}
+          <span className="text-text-muted text-sm font-normal">
+            ({combatants.length})
+          </span>
+        </h3>
+        {viewerCount && viewerCount.spectators > 0 && (
+          <span className="flex items-center gap-1 text-text-muted text-xs" title={`${viewerCount.players} player${viewerCount.players !== 1 ? "s" : ""}, ${viewerCount.spectators} spectator${viewerCount.spectators !== 1 ? "s" : ""}`}>
+            <Eye size={12} />
+            {viewerCount.spectators} spectator{viewerCount.spectators !== 1 ? "s" : ""}
+          </span>
+        )}
+      </div>
 
       {pcs.length > 0 && (
         <CombatantGroup
@@ -228,7 +239,7 @@ function CombatantCard({
                 onClick={onToggleEdit}
                 className="btn btn-ghost btn-sm text-xs"
               >
-                {isEditing ? "Done" : "Edit"}
+                {isEditing ? <Check size={14} /> : <Pencil size={14} />}
               </button>
               <button
                 onClick={() =>
@@ -239,7 +250,7 @@ function CombatantCard({
                 }
                 className="btn btn-ghost btn-sm text-xs text-accent-red"
               >
-                &times;
+                <Trash2 size={14} />
               </button>
             </div>
           )}
@@ -301,7 +312,17 @@ function CombatantCard({
               : "btn-secondary"
           }`}
         >
-          {!isMonster && isInCombat ? "In combat" : "+ Combat"}
+          {!isMonster && isInCombat ? (
+            <>
+              <CheckCircle size={14} />
+              In combat
+            </>
+          ) : (
+            <>
+              <Swords size={14} />
+              + Combat
+            </>
+          )}
         </button>
       )}
 

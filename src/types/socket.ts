@@ -179,6 +179,8 @@ export interface ServerToClientEvents {
   "dice:result": (roll: DiceRoll) => void;
   "notify:yourTurn": (combatantName: string) => void;
   "player:registered": (data: { combatantId: string; name: string }) => void;
+  "player:removed": () => void;
+  "session:viewerCount": (data: { spectators: number; players: number }) => void;
   error: (message: string) => void;
 }
 

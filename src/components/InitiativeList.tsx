@@ -1,6 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import {
+  GripVertical,
+  Skull,
+  Eye,
+  Dice6,
+  Check,
+  HeartPulse,
+} from "lucide-react";
 import type { EncounterWithCombatants, ClientToServerEvents } from "@/types/socket";
 import { HpTracker } from "./HpTracker";
 
@@ -34,27 +42,48 @@ export function InitiativeList({
 
   const deadEntries = encounter.combatants.filter((ec) => !ec.isActive);
 
+  // Rotate so current turn is at top (both DM and player views)
+  const isActive = encounter.status === "ACTIVE";
+  const shouldRotate = isActive && activeEntries.length > 0 && encounter.currentTurnIdx > 0;
+  const displayEntries = shouldRotate
+    ? [
+        ...activeEntries.slice(encounter.currentTurnIdx),
+        ...activeEntries.slice(0, encounter.currentTurnIdx),
+      ]
+    : activeEntries;
+
   return (
     <div className="space-y-3">
       <h3 className="text-lg">
         Initiative Order
-        {encounter.status === "ACTIVE" && (
+        {isActive && (
           <span className="text-text-muted text-sm font-normal ml-2">
             Round {encounter.roundNumber}
           </span>
         )}
       </h3>
 
-      {activeEntries.length === 0 ? (
+      {displayEntries.length === 0 ? (
         <p className="text-text-muted text-sm text-center py-4">
           No active combatants
         </p>
       ) : (
         <div className="space-y-1">
-          {activeEntries.map((entry, idx) => {
+          {displayEntries.map((entry, idx) => {
+            // Always use original index for current turn detection
+            const originalIdx = activeEntries.indexOf(entry);
             const isCurrent =
-              encounter.status === "ACTIVE" &&
-              idx === encounter.currentTurnIdx;
+              isActive && originalIdx === encounter.currentTurnIdx;
+
+            // Position label (both views)
+            let positionLabel: string | null = null;
+            if (isActive) {
+              if (idx === 0) positionLabel = "NOW";
+              else if (idx === 1) positionLabel = "ON DECK";
+            }
+
+            // Drag-reorder needs original sorted index for server
+            const dragIdx = originalIdx;
 
             return (
               <InitiativeCard
@@ -68,11 +97,12 @@ export function InitiativeList({
                 emit={emit}
                 readOnly={readOnly}
                 draggable={canDrag}
-                isDragOver={dragOverIdx === idx}
+                isDragOver={dragOverIdx === dragIdx}
+                positionLabel={positionLabel}
                 onDragStart={() => setDraggedId(entry.id)}
                 onDragOver={(e) => {
                   e.preventDefault();
-                  setDragOverIdx(idx);
+                  setDragOverIdx(dragIdx);
                 }}
                 onDragEnd={() => {
                   setDraggedId(null);
@@ -84,7 +114,7 @@ export function InitiativeList({
                       joinCode,
                       encounterId: encounter.id,
                       instanceId: draggedId,
-                      newIndex: idx,
+                      newIndex: dragIdx,
                     });
                   }
                   setDraggedId(null);
@@ -98,16 +128,18 @@ export function InitiativeList({
 
       {/* Dead combatants */}
       {deadEntries.length > 0 && (
-        <div className="space-y-1 pt-2 border-t border-border">
-          <p className="text-text-muted text-xs uppercase tracking-wider">
-            Dead / KO
+        <div className="space-y-1 pt-2 border-t border-dashed border-accent-red/30">
+          <p className="text-accent-red/60 text-xs uppercase tracking-wider flex items-center gap-1.5">
+            <Skull size={12} />
+            Fallen
           </p>
           {deadEntries.map((entry) => (
             <div
               key={entry.id}
-              className="card combatant-dead py-2 px-3 flex items-center justify-between"
+              className="card combatant-dead py-2 px-3 flex items-center justify-between transition-all duration-300"
             >
               <div className="flex items-center gap-2">
+                <Skull size={12} className="text-accent-red/40" />
                 <span className="text-sm">{entry.displayName}</span>
                 {entry.initiative !== null && (
                   <span className="text-xs text-text-muted">
@@ -126,6 +158,7 @@ export function InitiativeList({
                   }
                   className="btn btn-ghost btn-sm text-xs text-accent-green"
                 >
+                  <HeartPulse size={14} />
                   Revive
                 </button>
               )}
@@ -148,6 +181,7 @@ function InitiativeCard({
   readOnly,
   draggable,
   isDragOver,
+  positionLabel,
   onDragStart,
   onDragOver,
   onDragEnd,
@@ -163,6 +197,7 @@ function InitiativeCard({
   readOnly?: boolean;
   draggable?: boolean;
   isDragOver?: boolean;
+  positionLabel?: string | null;
   onDragStart?: () => void;
   onDragOver?: (e: React.DragEvent) => void;
   onDragEnd?: () => void;
@@ -224,7 +259,7 @@ function InitiativeCard({
         e.preventDefault();
         onDrop?.();
       }}
-      className={`card py-2 px-3 transition-all ${
+      className={`card py-2 px-3 transition-all duration-300 ${
         isCurrent ? "current-turn" : ""
       } ${isDragOver ? "ring-2 ring-accent-gold" : ""} ${
         draggable ? "cursor-grab select-none" : ""
@@ -232,11 +267,9 @@ function InitiativeCard({
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          {/* Drag handle indicator */}
+          {/* Drag handle */}
           {draggable && (
-            <div className="text-text-muted px-0.5">
-              ⠿
-            </div>
+            <GripVertical size={16} className="text-text-muted" />
           )}
           {/* Initiative number */}
           <div className="w-8 h-8 rounded-full bg-bg-tertiary flex items-center justify-center text-sm font-bold">
@@ -269,6 +302,11 @@ function InitiativeCard({
                 Current Turn
               </span>
             )}
+            {positionLabel && !isCurrent && (
+              <span className="text-[10px] text-text-muted uppercase tracking-wider">
+                {positionLabel}
+              </span>
+            )}
           </div>
         </div>
 
@@ -289,7 +327,7 @@ function InitiativeCard({
                     className="btn btn-ghost btn-sm text-xs"
                     disabled={!manualInit}
                   >
-                    Set
+                    <Check size={14} />
                   </button>
                 </div>
               )}
@@ -297,6 +335,7 @@ function InitiativeCard({
                 onClick={handleAutoRoll}
                 className="btn btn-secondary btn-sm text-xs"
               >
+                <Dice6 size={14} />
                 Roll
               </button>
             </>
@@ -313,6 +352,7 @@ function InitiativeCard({
               }
               className="btn btn-ghost btn-sm text-xs text-accent-purple"
             >
+              <Eye size={14} />
               Reveal
             </button>
           )}
@@ -328,7 +368,7 @@ function InitiativeCard({
               className="btn btn-ghost btn-sm text-xs text-accent-red"
               title="Kill / KO"
             >
-              KO
+              <Skull size={14} />
             </button>
           )}
         </div>

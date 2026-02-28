@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronLeft, ChevronRight, StopCircle, Dice6, Swords } from "lucide-react";
 import type { EncounterWithCombatants, ClientToServerEvents } from "@/types/socket";
 
 type EmitFn = <E extends keyof ClientToServerEvents>(
@@ -28,7 +29,7 @@ export function CombatControls({
       <div className="flex items-center justify-between">
         <h3 className="text-lg">Combat</h3>
         {encounter.status === "ACTIVE" && (
-          <span className="text-xs text-text-muted">
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-accent-gold/15 text-accent-gold text-xs font-bold font-[family-name:var(--font-heading)]">
             Round {encounter.roundNumber}
           </span>
         )}
@@ -45,6 +46,7 @@ export function CombatControls({
           className="btn btn-primary w-full"
           disabled={encounter.combatants.length === 0}
         >
+          <Dice6 size={18} />
           Start Rolling Initiative
         </button>
       )}
@@ -67,6 +69,7 @@ export function CombatControls({
               }
               className="btn btn-secondary flex-1"
             >
+              <Dice6 size={16} />
               Roll All Remaining
             </button>
             <button
@@ -79,6 +82,7 @@ export function CombatControls({
               disabled={!allRolled}
               className="btn btn-primary flex-1"
             >
+              <Swords size={16} />
               Start Combat
             </button>
           </div>
@@ -97,7 +101,8 @@ export function CombatControls({
               }
               className="btn btn-secondary flex-1"
             >
-              &larr; Prev
+              <ChevronLeft size={18} />
+              Prev
             </button>
             <button
               onClick={() =>
@@ -106,9 +111,10 @@ export function CombatControls({
                   encounterId: encounter.id,
                 })
               }
-              className="btn btn-primary flex-1"
+              className="btn btn-primary-lg flex-[2] rounded-lg"
             >
-              Next &rarr;
+              Next
+              <ChevronRight size={20} />
             </button>
           </div>
           <button
@@ -121,6 +127,7 @@ export function CombatControls({
             className="btn btn-danger w-full btn-sm"
             disabled={activeCount === 0}
           >
+            <StopCircle size={14} />
             End Combat
           </button>
         </div>

@@ -32,8 +32,11 @@ export function useSocket(joinCode: string, isDM: boolean = false) {
       setSessionState(state);
     }
 
+    let errorTimer: ReturnType<typeof setTimeout>;
     function onError(msg: string) {
       setError(msg);
+      clearTimeout(errorTimer);
+      errorTimer = setTimeout(() => setError(null), 5000);
     }
 
     socket.on("connect", onConnect);
@@ -47,6 +50,7 @@ export function useSocket(joinCode: string, isDM: boolean = false) {
     }
 
     return () => {
+      clearTimeout(errorTimer);
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
       socket.off("session:state", onState);

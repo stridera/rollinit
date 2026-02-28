@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { Eye, LogIn, Github, Users } from "lucide-react";
 import { useSocket } from "@/lib/useSocket";
 import type { CombatantWithInstances, EncounterWithCombatants } from "@/types/socket";
 import { ConnectionStatus } from "./ConnectionStatus";
@@ -9,14 +10,28 @@ import { CurrentTurnBanner } from "./CurrentTurnBanner";
 import { DiceRoller } from "./DiceRoller";
 import { DiceLog } from "./DiceLog";
 import { NotificationPermission } from "./NotificationPermission";
+import { D20Icon } from "./D20Icon";
 
 const STORAGE_KEY_PREFIX = "rollinit:player:";
+
+const WAITING_MESSAGES = [
+  "The DM prepares the encounter...",
+  "Sharpen your blades, adventurer.",
+  "Something stirs in the shadows...",
+  "Roll for perception... just kidding.",
+  "The tavern grows quiet...",
+  "A mysterious fog rolls in...",
+  "Your fate is being written...",
+];
 
 export function PlayerView({ joinCode }: { joinCode: string }) {
   const [playerName, setPlayerName] = useState("");
   const [combatantId, setCombatantId] = useState<string | null>(null);
   const [hasJoined, setHasJoined] = useState(false);
   const [isReconnecting, setIsReconnecting] = useState(true);
+  const [waitingMsgIdx, setWaitingMsgIdx] = useState(0);
+  const [removedMessage, setRemovedMessage] = useState("");
+  const [viewerCount, setViewerCount] = useState<{ spectators: number; players: number } | null>(null);
 
   // Form inputs
   const [nameInput, setNameInput] = useState("");
@@ -26,6 +41,14 @@ export function PlayerView({ joinCode }: { joinCode: string }) {
 
   const { socket, connected, sessionState, setSessionState, error, emit } =
     useSocket(joinCode, false);
+
+  // Cycle waiting messages
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setWaitingMsgIdx((prev) => (prev + 1) % WAITING_MESSAGES.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Handle player:registered response
   const onPlayerRegistered = useCallback(
@@ -52,13 +75,11 @@ export function PlayerView({ joinCode }: { joinCode: string }) {
         const { combatantId: storedId } = JSON.parse(stored);
         if (storedId) {
           emit("player:reconnect", { joinCode, combatantId: storedId });
-          // Listen for error during reconnect
           const onError = () => {
             localStorage.removeItem(`${STORAGE_KEY_PREFIX}${joinCode}`);
             setIsReconnecting(false);
           };
           socket.once("error", onError);
-          // If registered event comes, the error listener is no longer needed
           const onRegistered = (data: { combatantId: string; name: string }) => {
             socket.off("error", onError);
             onPlayerRegistered(data);
@@ -100,14 +121,22 @@ export function PlayerView({ joinCode }: { joinCode: string }) {
       });
     }
 
-    function onCombatantRemoved(combatantId: string) {
+    function onCombatantRemoved(removedId: string) {
       setSessionState((prev) => {
         if (!prev) return prev;
         return {
           ...prev,
-          combatants: prev.combatants.filter((c) => c.id !== combatantId),
+          combatants: prev.combatants.filter((c) => c.id !== removedId),
         };
       });
+    }
+
+    function onPlayerRemoved() {
+      localStorage.removeItem(`${STORAGE_KEY_PREFIX}${joinCode}`);
+      setCombatantId(null);
+      setPlayerName("");
+      setHasJoined(false);
+      setRemovedMessage("Your character was removed by the DM. You may rejoin.");
     }
 
     function onEncounterUpdate(encounter: EncounterWithCombatants) {
@@ -151,6 +180,10 @@ export function PlayerView({ joinCode }: { joinCode: string }) {
       }
     }
 
+    function onViewerCount(data: { spectators: number; players: number }) {
+      setViewerCount(data);
+    }
+
     socket.on("combatant:added", onCombatantAdded);
     socket.on("combatant:updated", onCombatantUpdated);
     socket.on("combatant:removed", onCombatantRemoved);
@@ -161,6 +194,8 @@ export function PlayerView({ joinCode }: { joinCode: string }) {
     socket.on("combat:ended", onEncounterUpdate);
     socket.on("session:lockChanged", onLockChanged);
     socket.on("notify:yourTurn", onYourTurn);
+    socket.on("player:removed", onPlayerRemoved);
+    socket.on("session:viewerCount", onViewerCount);
 
     return () => {
       socket.off("combatant:added", onCombatantAdded);
@@ -173,18 +208,22 @@ export function PlayerView({ joinCode }: { joinCode: string }) {
       socket.off("combat:ended", onEncounterUpdate);
       socket.off("session:lockChanged", onLockChanged);
       socket.off("notify:yourTurn", onYourTurn);
+      socket.off("player:removed", onPlayerRemoved);
+      socket.off("session:viewerCount", onViewerCount);
     };
-  }, [socket, setSessionState]);
+  }, [socket, setSessionState, joinCode]);
 
   const activeEncounter = sessionState?.encounters.find(
     (e) => e.id === sessionState.activeEncounterId
   );
 
+  const totalViewers = viewerCount ? viewerCount.players + viewerCount.spectators : 0;
+
   function handleRegister(e: React.FormEvent) {
     e.preventDefault();
     if (!nameInput.trim()) return;
+    setRemovedMessage("");
 
-    // Listen for registration response
     socket?.once("player:registered", onPlayerRegistered);
 
     emit("player:register", {
@@ -225,7 +264,13 @@ export function PlayerView({ joinCode }: { joinCode: string }) {
             </p>
           </div>
 
-          {error && (
+          {removedMessage && (
+            <div className="bg-accent-red/20 border border-accent-red/40 rounded-lg px-4 py-2 text-accent-red text-sm text-center">
+              {removedMessage}
+            </div>
+          )}
+
+          {error && !removedMessage && (
             <div className="bg-accent-red/20 border border-accent-red/40 rounded-lg px-4 py-2 text-accent-red text-sm">
               {error}
             </div>
@@ -282,6 +327,7 @@ export function PlayerView({ joinCode }: { joinCode: string }) {
               disabled={!nameInput.trim()}
               className="btn btn-primary w-full"
             >
+              <LogIn size={18} />
               Join Session
             </button>
           </form>
@@ -291,6 +337,7 @@ export function PlayerView({ joinCode }: { joinCode: string }) {
             onClick={handleSpectate}
             className="btn btn-ghost w-full text-xs text-text-muted"
           >
+            <Eye size={14} />
             Spectate Only
           </button>
         </div>
@@ -309,7 +356,18 @@ export function PlayerView({ joinCode }: { joinCode: string }) {
               {combatantId ? playerName : "Spectator"} &middot; {joinCode}
             </p>
           </div>
-          <ConnectionStatus connected={connected} />
+          <div className="flex items-center gap-3">
+            <a
+              href="https://github.com/stridera/rollinit/issues"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-text-muted hover:text-text-secondary transition-colors"
+              title="Report an issue"
+            >
+              <Github size={16} />
+            </a>
+            <ConnectionStatus connected={connected} />
+          </div>
         </div>
       </header>
 
@@ -337,18 +395,46 @@ export function PlayerView({ joinCode }: { joinCode: string }) {
           />
         )}
 
+        {/* Atmospheric waiting state */}
         {!activeEncounter && (
-          <div className="card text-center py-12">
-            <p className="text-text-secondary">
-              Waiting for the DM to start an encounter...
-            </p>
+          <div className="card text-center py-12 relative overflow-hidden">
+            {/* Torch flicker glow */}
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                background: "radial-gradient(ellipse at center, rgba(212, 168, 67, 0.06) 0%, transparent 60%)",
+                animation: "torchFlicker 3s ease-in-out infinite",
+              }}
+            />
+            <div className="relative">
+              <D20Icon
+                size={48}
+                className="text-accent-gold mx-auto mb-4 opacity-40"
+                key="waiting-d20"
+              />
+              <p
+                key={waitingMsgIdx}
+                className="text-text-secondary italic animate-fade-in"
+              >
+                {WAITING_MESSAGES[waitingMsgIdx]}
+              </p>
+              {totalViewers > 0 && (
+                <p className="text-text-muted text-xs mt-3 flex items-center justify-center gap-1">
+                  <Users size={12} />
+                  {viewerCount!.players} player{viewerCount!.players !== 1 ? "s" : ""}
+                  {viewerCount!.spectators > 0 && (
+                    <>, {viewerCount!.spectators} spectator{viewerCount!.spectators !== 1 ? "s" : ""}</>
+                  )}
+                </p>
+              )}
+            </div>
           </div>
         )}
 
         {/* Notification permission */}
         <NotificationPermission />
 
-        {/* Dice Roller + Log — only for registered players */}
+        {/* Dice Roller + Log -- only for registered players */}
         {combatantId && (
           <DiceRoller
             joinCode={joinCode}

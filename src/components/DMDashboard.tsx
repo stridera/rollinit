@@ -2,6 +2,17 @@
 
 import { useSocket } from "@/lib/useSocket";
 import { useState, useEffect } from "react";
+import {
+  Lock,
+  Unlock,
+  RefreshCw,
+  Link,
+  Users,
+  Swords,
+  Dice6,
+  Github,
+  Eye,
+} from "lucide-react";
 import type { CombatantWithInstances, EncounterWithCombatants } from "@/types/socket";
 import { ConnectionStatus } from "./ConnectionStatus";
 import { AddCombatantForm } from "./AddCombatantForm";
@@ -11,6 +22,8 @@ import { CombatControls } from "./CombatControls";
 import { InitiativeList } from "./InitiativeList";
 import { DiceRoller } from "./DiceRoller";
 import { DiceLog } from "./DiceLog";
+
+type MobileTab = "combatants" | "combat" | "dice";
 
 export function DMDashboard({
   joinCode,
@@ -24,12 +37,13 @@ export function DMDashboard({
 
   const [copied, setCopied] = useState(false);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
+  const [mobileTab, setMobileTab] = useState<MobileTab>("combat");
+  const [viewerCount, setViewerCount] = useState<{ spectators: number; players: number } | null>(null);
 
   function handleCopyCode() {
     if (navigator.clipboard?.writeText) {
       navigator.clipboard.writeText(joinCode);
     } else {
-      // Fallback for non-HTTPS contexts
       const textarea = document.createElement("textarea");
       textarea.value = joinCode;
       textarea.style.position = "fixed";
@@ -64,7 +78,6 @@ export function DMDashboard({
     function onCombatantAdded(combatant: CombatantWithInstances) {
       setSessionState((prev) => {
         if (!prev) return prev;
-        // Avoid duplicates
         if (prev.combatants.some((c) => c.id === combatant.id)) return prev;
         return { ...prev, combatants: [...prev.combatants, combatant] };
       });
@@ -106,7 +119,6 @@ export function DMDashboard({
         } else {
           encounters = [...prev.encounters, encounter];
         }
-        // Update active encounter - any non-COMPLETED encounter becomes active
         const activeEncounterId =
           encounter.status === "COMPLETED"
             ? encounter.id === prev.activeEncounterId
@@ -129,6 +141,10 @@ export function DMDashboard({
       window.location.reload();
     }
 
+    function onViewerCount(data: { spectators: number; players: number }) {
+      setViewerCount(data);
+    }
+
     socket.on("combatant:added", onCombatantAdded);
     socket.on("combatant:updated", onCombatantUpdated);
     socket.on("combatant:removed", onCombatantRemoved);
@@ -139,6 +155,7 @@ export function DMDashboard({
     socket.on("combat:ended", onEncounterUpdate);
     socket.on("session:lockChanged", onLockChanged);
     socket.on("session:codeRegenerated", onCodeRegenerated);
+    socket.on("session:viewerCount", onViewerCount);
 
     return () => {
       socket.off("combatant:added", onCombatantAdded);
@@ -151,6 +168,7 @@ export function DMDashboard({
       socket.off("combat:ended", onEncounterUpdate);
       socket.off("session:lockChanged", onLockChanged);
       socket.off("session:codeRegenerated", onCodeRegenerated);
+      socket.off("session:viewerCount", onViewerCount);
     };
   }, [socket, setSessionState]);
 
@@ -160,7 +178,6 @@ export function DMDashboard({
     (e) => e.id === sessionState.activeEncounterId
   );
 
-  // Determine which encounter to display
   const displayEncounter = selectedEncounterId
     ? sessionState?.encounters.find((e) => e.id === selectedEncounterId)
     : activeEncounter;
@@ -175,6 +192,13 @@ export function DMDashboard({
   useEffect(() => {
     setSelectedEncounterId(null);
   }, [sessionState?.activeEncounterId]);
+
+  // Auto-switch to combat tab when encounter becomes ACTIVE
+  useEffect(() => {
+    if (activeEncounter?.status === "ACTIVE") {
+      setMobileTab("combat");
+    }
+  }, [activeEncounter?.status]);
 
   return (
     <div className="min-h-dvh relative z-10">
@@ -199,28 +223,35 @@ export function DMDashboard({
             </div>
             <button
               onClick={handleToggleLock}
-              className={`text-xs px-2 py-1 rounded transition-colors flex items-center gap-1 ${
+              className={`p-1.5 rounded transition-colors ${
                 sessionState?.isLocked
                   ? "text-accent-red bg-accent-red/10"
                   : "text-text-muted hover:text-text-secondary"
               }`}
-              title={sessionState?.isLocked ? "Click to unlock session" : "Click to lock session"}
+              title={sessionState?.isLocked ? "Unlock session" : "Lock session"}
             >
-              <span>{sessionState?.isLocked ? "\u{1F512}" : "\u{1F513}"}</span>
-              {sessionState?.isLocked ? "Locked" : "Open"}
+              {sessionState?.isLocked ? <Lock size={16} /> : <Unlock size={16} />}
             </button>
             <button
               onClick={handleRegenerate}
-              className={`text-xs px-2 py-1 rounded transition-colors flex items-center gap-1 ${
+              className={`p-1.5 rounded transition-colors ${
                 confirmRegenerate
                   ? "text-accent-red bg-accent-red/10"
                   : "text-text-muted hover:text-text-secondary"
               }`}
-              title="Regenerate join code (kicks all players)"
+              title={confirmRegenerate ? "Click again to confirm" : "Regenerate join code (kicks all players)"}
             >
-              <span>{"\u{21BB}"}</span>
-              {confirmRegenerate ? "Confirm?" : "Regen"}
+              <RefreshCw size={16} className={confirmRegenerate ? "animate-spin" : ""} />
             </button>
+            <a
+              href="https://github.com/stridera/rollinit/issues"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-text-muted hover:text-text-secondary transition-colors"
+              title="Report an issue"
+            >
+              <Github size={16} />
+            </a>
             <ConnectionStatus connected={connected} />
           </div>
         </div>
@@ -234,10 +265,10 @@ export function DMDashboard({
         </div>
       )}
 
-      <main className="max-w-7xl mx-auto px-4 py-6">
+      <main className="max-w-7xl mx-auto px-4 py-6 pb-20 lg:pb-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left column: Combatants + Add Form */}
-          <div className="space-y-6">
+          <div className={`space-y-6 ${mobileTab !== "combatants" ? "hidden lg:block" : ""}`}>
             <AddCombatantForm joinCode={joinCode} emit={emit} />
             <CombatantList
               combatants={sessionState?.combatants ?? []}
@@ -247,11 +278,12 @@ export function DMDashboard({
               activeEncounterId={sessionState?.activeEncounterId}
               activeEncounterStatus={activeEncounter?.status}
               activeEncounterCombatantIds={activeEncounterCombatantIds}
+              viewerCount={viewerCount}
             />
           </div>
 
           {/* Center column: Initiative / Combat */}
-          <div className="space-y-6">
+          <div className={`space-y-6 ${mobileTab !== "combat" ? "hidden lg:block" : ""}`}>
             <EncounterManager
               encounters={sessionState?.encounters ?? []}
               activeEncounterId={sessionState?.activeEncounterId ?? null}
@@ -282,7 +314,7 @@ export function DMDashboard({
           </div>
 
           {/* Right column: Dice Roller + Log */}
-          <div className="space-y-6">
+          <div className={`space-y-6 ${mobileTab !== "dice" ? "hidden lg:block" : ""}`}>
             <DiceRoller
               joinCode={joinCode}
               rollerName="DM"
@@ -296,10 +328,53 @@ export function DMDashboard({
         </div>
       </main>
 
+      {/* Mobile bottom tab bar */}
+      <div className="fixed bottom-0 left-0 right-0 z-30 lg:hidden border-t border-border bg-bg-secondary/95 backdrop-blur-sm">
+        <div className="flex">
+          <button
+            onClick={() => setMobileTab("combatants")}
+            className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 text-xs transition-colors ${
+              mobileTab === "combatants"
+                ? "text-accent-gold"
+                : "text-text-muted"
+            }`}
+          >
+            <Users size={20} />
+            Party
+          </button>
+          <button
+            onClick={() => setMobileTab("combat")}
+            className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 text-xs transition-colors relative ${
+              mobileTab === "combat"
+                ? "text-accent-gold"
+                : "text-text-muted"
+            }`}
+          >
+            <Swords size={20} />
+            Combat
+            {activeEncounter?.status === "ACTIVE" && (
+              <span className="absolute top-1.5 right-1/4 w-2 h-2 bg-accent-gold rounded-full" />
+            )}
+          </button>
+          <button
+            onClick={() => setMobileTab("dice")}
+            className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 text-xs transition-colors ${
+              mobileTab === "dice"
+                ? "text-accent-gold"
+                : "text-text-muted"
+            }`}
+          >
+            <Dice6 size={20} />
+            Dice
+          </button>
+        </div>
+      </div>
+
       {/* DM Token reminder */}
-      <div className="fixed bottom-4 left-4 z-30">
+      <div className="fixed bottom-16 lg:bottom-4 left-4 z-30">
         <details className="group">
-          <summary className="cursor-pointer text-text-muted text-xs hover:text-text-secondary">
+          <summary className="cursor-pointer text-text-muted text-xs hover:text-text-secondary flex items-center gap-1">
+            <Link size={12} />
             DM Link
           </summary>
           <div className="mt-2 card text-xs max-w-sm">

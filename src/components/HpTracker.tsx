@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
+import { Sword, Heart } from "lucide-react";
 
 function getHpDescription(current: number, max: number): string {
   const pct = current / max;
@@ -32,7 +33,19 @@ export function HpTracker({
   showExact: boolean;
 }) {
   const [hpDelta, setHpDelta] = useState("");
+  const [deathFlash, setDeathFlash] = useState(false);
+  const prevHpRef = useRef(currentHp);
   const pct = Math.max(0, Math.min(100, (currentHp / maxHp) * 100));
+
+  // Detect HP transition from >0 to 0
+  useEffect(() => {
+    if (prevHpRef.current > 0 && currentHp === 0) {
+      setDeathFlash(true);
+      const timer = setTimeout(() => setDeathFlash(false), 600);
+      return () => clearTimeout(timer);
+    }
+    prevHpRef.current = currentHp;
+  }, [currentHp]);
 
   function applyHp(mode: "damage" | "heal") {
     const val = parseInt(hpDelta);
@@ -55,7 +68,7 @@ export function HpTracker({
   }
 
   return (
-    <div className="space-y-1.5">
+    <div className={`space-y-1.5 ${deathFlash ? "animate-death-flash" : ""}`}>
       {/* HP Bar */}
       <div className="flex items-center gap-2">
         <div className="flex-1 h-2 bg-bg-tertiary rounded-full overflow-hidden">
@@ -102,6 +115,7 @@ export function HpTracker({
             disabled={!hpDelta}
             className="btn btn-ghost btn-sm text-xs px-2 text-accent-red"
           >
+            <Sword size={12} />
             Dmg
           </button>
           <button
@@ -109,6 +123,7 @@ export function HpTracker({
             disabled={!hpDelta}
             className="btn btn-ghost btn-sm text-xs px-2 text-accent-green"
           >
+            <Heart size={12} />
             Heal
           </button>
           <button

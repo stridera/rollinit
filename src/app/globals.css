@@ -37,6 +37,21 @@
   --hp-yellow: #f39c12;
   --hp-red: #c0392b;
 
+  /* Dice type colors */
+  --dice-d4: #a855f7;
+  --dice-d6: #3b82f6;
+  --dice-d8: #22c55e;
+  --dice-d10: #eab308;
+  --dice-d12: #f97316;
+  --dice-d20: #ef4444;
+  --dice-d100: #ec4899;
+
+  /* Special roll colors */
+  --nat20-gold: #fbbf24;
+  --nat1-red: #dc2626;
+  --death-red: #991b1b;
+  --death-bg: rgba(153, 27, 27, 0.15);
+
   --font-heading: "MedievalSharp", cursive;
   --font-body: system-ui, -apple-system, sans-serif;
 
@@ -74,6 +89,16 @@
   --color-hp-green: var(--hp-green);
   --color-hp-yellow: var(--hp-yellow);
   --color-hp-red: var(--hp-red);
+
+  --color-dice-d4: var(--dice-d4);
+  --color-dice-d6: var(--dice-d6);
+  --color-dice-d8: var(--dice-d8);
+  --color-dice-d10: var(--dice-d10);
+  --color-dice-d12: var(--dice-d12);
+  --color-dice-d20: var(--dice-d20);
+  --color-dice-d100: var(--dice-d100);
+  --color-nat20-gold: var(--nat20-gold);
+  --color-nat1-red: var(--nat1-red);
 }
 
 * {
@@ -290,14 +315,150 @@ input::placeholder {
   animation: slideIn 0.3s ease-out;
 }
 
-/* Current turn highlight */
-.current-turn {
-  border-color: var(--accent-gold) !important;
-  animation: pulseGlow 2s ease-in-out infinite;
+/* Dice roll animation */
+@keyframes diceRoll {
+  0% { transform: scale(0.3) rotate(0deg); opacity: 0; }
+  50% { transform: scale(1.1) rotate(180deg); opacity: 1; }
+  100% { transform: scale(1) rotate(360deg); opacity: 1; }
 }
 
-/* Dead combatant */
+@keyframes nat20Burst {
+  0% { transform: scale(0.5); opacity: 0; filter: brightness(1); }
+  30% { transform: scale(1.3); opacity: 1; filter: brightness(1.5); }
+  60% { transform: scale(0.95); filter: brightness(1.2); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+
+@keyframes nat1Shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+  20%, 40%, 60%, 80% { transform: translateX(4px); }
+}
+
+@keyframes deathFlash {
+  0% { background-color: transparent; }
+  25% { background-color: var(--death-bg); }
+  50% { background-color: transparent; }
+  75% { background-color: var(--death-bg); }
+  100% { background-color: transparent; }
+}
+
+@keyframes floatParticle {
+  0% { transform: translateY(0) translateX(0); opacity: 0; }
+  20% { opacity: 0.6; }
+  80% { opacity: 0.3; }
+  100% { transform: translateY(-120px) translateX(20px); opacity: 0; }
+}
+
+@keyframes torchFlicker {
+  0%, 100% { opacity: 0.3; }
+  25% { opacity: 0.4; }
+  50% { opacity: 0.25; }
+  75% { opacity: 0.35; }
+}
+
+@keyframes currentTurnPulse {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(212, 168, 67, 0.3),
+                inset 0 0 8px rgba(212, 168, 67, 0.05);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(212, 168, 67, 0.5),
+                inset 0 0 16px rgba(212, 168, 67, 0.08);
+  }
+}
+
+@keyframes spotlightReveal {
+  0% { transform: scale(0.5); opacity: 0; }
+  60% { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes scaleIn {
+  0% { transform: scale(0.8); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes slowSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-dice-roll {
+  animation: diceRoll 0.6s ease-out;
+}
+
+.animate-nat20 {
+  animation: nat20Burst 0.8s ease-out;
+}
+
+.animate-nat1 {
+  animation: nat1Shake 0.6s ease-out;
+}
+
+.animate-death-flash {
+  animation: deathFlash 0.6s ease-out;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.3s ease-out;
+}
+
+.animate-spotlight {
+  animation: spotlightReveal 0.4s ease-out;
+}
+
+/* Floating particles */
+.particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent-gold);
+  pointer-events: none;
+  animation: floatParticle 4s ease-in-out infinite;
+}
+
+.particle-1 { left: 20%; bottom: 10%; animation-delay: 0s; animation-duration: 4s; }
+.particle-2 { left: 45%; bottom: 5%; animation-delay: 1s; animation-duration: 5s; }
+.particle-3 { left: 70%; bottom: 15%; animation-delay: 2s; animation-duration: 3.5s; }
+.particle-4 { left: 85%; bottom: 8%; animation-delay: 0.5s; animation-duration: 4.5s; }
+
+/* Current turn highlight — enhanced */
+.current-turn {
+  border: 2px solid var(--accent-gold) !important;
+  background: linear-gradient(135deg, var(--bg-card), rgba(212, 168, 67, 0.06)) !important;
+  animation: currentTurnPulse 2s ease-in-out infinite;
+}
+
+/* Dead combatant — enhanced with red tint */
 .combatant-dead {
   opacity: 0.4;
   filter: grayscale(0.6);
+  position: relative;
+}
+
+.combatant-dead::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(153, 27, 27, 0.1);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+/* Prominent primary large button */
+.btn-primary-lg {
+  background: var(--accent-gold);
+  color: var(--bg-primary);
+  border-color: var(--accent-gold);
+  padding: 0.75rem 1.5rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  box-shadow: 0 0 12px rgba(212, 168, 67, 0.2);
+}
+
+.btn-primary-lg:hover:not(:disabled) {
+  background: var(--accent-gold-dim);
+  box-shadow: 0 0 24px rgba(212, 168, 67, 0.4);
 }

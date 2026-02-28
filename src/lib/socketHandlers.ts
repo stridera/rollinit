@@ -12,6 +12,10 @@ import type {
 type IO = Server<ClientToServerEvents, ServerToClientEvents>;
 type SocketInstance = Socket<ClientToServerEvents, ServerToClientEvents>;
 
+function capitalizeFirst(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 async function getSessionState(joinCode: string): Promise<SessionState | null> {
   const session = await prisma.session.findUnique({
     where: { joinCode },
@@ -92,6 +96,33 @@ async function reassignSortOrder(encounterId: string) {
   );
 }
 
+async function broadcastViewerCount(io: IO, joinCode: string) {
+  const sessionSockets = await io.in(`session:${joinCode}`).fetchSockets();
+  const dmSockets = await io.in(`dm:${joinCode}`).fetchSockets();
+  const dmSocketIds = new Set(dmSockets.map((s) => s.id));
+
+  const combatants = await prisma.combatant.findMany({
+    where: { session: { joinCode }, playerSocketId: { not: null } },
+    select: { playerSocketId: true },
+  });
+  const playerSocketIds = new Set(combatants.map((c) => c.playerSocketId));
+
+  let players = 0;
+  let spectators = 0;
+  for (const s of sessionSockets) {
+    if (dmSocketIds.has(s.id)) continue;
+    if (playerSocketIds.has(s.id)) {
+      players++;
+    } else {
+      spectators++;
+    }
+  }
+
+  const data = { spectators, players };
+  io.to(`session:${joinCode}`).emit("session:viewerCount", data);
+  io.to(`dm:${joinCode}`).emit("session:viewerCount", data);
+}
+
 export function registerSocketHandlers(io: IO, socket: SocketInstance) {
   // --- Session ---
   socket.on("session:join", async ({ joinCode, isDM }) => {
@@ -100,11 +131,6 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
     });
     if (!session) {
       socket.emit("error", "Session not found");
-      return;
-    }
-
-    if (session.isLocked && !isDM) {
-      socket.emit("error", "Session is locked — the DM has restricted new joins");
       return;
     }
 
@@ -119,11 +145,14 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
     } else {
       socket.emit("session:state", filterStateForPlayers(state));
     }
+
+    broadcastViewerCount(io, joinCode);
   });
 
   socket.on("session:leave", ({ joinCode }) => {
     socket.leave(`session:${joinCode}`);
     socket.leave(`dm:${joinCode}`);
+    broadcastViewerCount(io, joinCode);
   });
 
   // --- Combatants (templates) ---
@@ -135,7 +164,7 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
 
     const combatant = await prisma.combatant.create({
       data: {
-        name: data.name,
+        name: capitalizeFirst(data.name),
         type: data.type,
         initiativeBonus: data.initiativeBonus,
         maxHp: data.maxHp,
@@ -155,9 +184,11 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
   });
 
   socket.on("combatant:update", async (data) => {
+    const updates = { ...data.updates };
+    if (updates.name) updates.name = capitalizeFirst(updates.name);
     const combatant = await prisma.combatant.update({
       where: { id: data.combatantId },
-      data: data.updates,
+      data: updates,
       include: { encounterCombatants: true },
     });
 
@@ -171,9 +202,116 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
   });
 
   socket.on("combatant:remove", async (data) => {
+    // Look up the combatant before deleting so we can disconnect the player
+    // and find which encounters are affected
+    const combatant = await prisma.combatant.findUnique({
+      where: { id: data.combatantId },
+      include: { encounterCombatants: true, session: true },
+    });
+    if (!combatant) return;
+
+    // For each active encounter, snapshot the old active list so we can
+    // fix currentTurnIdx after the cascade delete
+    const affectedEncounters: Array<{
+      encounterId: string;
+      oldActiveIds: string[];   // entry IDs in sort order
+      oldTurnIdx: number;
+    }> = [];
+
+    for (const ec of combatant.encounterCombatants) {
+      // Only need special handling for encounters that are ACTIVE
+      if (!affectedEncounters.some((a) => a.encounterId === ec.encounterId)) {
+        const enc = await prisma.encounter.findUnique({
+          where: { id: ec.encounterId },
+          include: {
+            combatants: {
+              where: { isActive: true },
+              orderBy: { sortOrder: "asc" },
+            },
+          },
+        });
+        if (enc) {
+          affectedEncounters.push({
+            encounterId: enc.id,
+            oldActiveIds: enc.combatants.map((c) => c.id),
+            oldTurnIdx: enc.status === "ACTIVE" ? enc.currentTurnIdx : -1,
+          });
+        }
+      }
+    }
+
     await prisma.combatant.delete({ where: { id: data.combatantId } });
     io.to(`session:${data.joinCode}`).emit("combatant:removed", data.combatantId);
     io.to(`dm:${data.joinCode}`).emit("combatant:removed", data.combatantId);
+
+    // Broadcast updated encounter state and fix turn index
+    for (const { encounterId, oldActiveIds, oldTurnIdx } of affectedEncounters) {
+      const encounter = await prisma.encounter.findUnique({
+        where: { id: encounterId },
+        include: {
+          combatants: {
+            include: { combatant: true },
+            orderBy: { sortOrder: "asc" },
+          },
+        },
+      });
+      if (!encounter) continue;
+
+      if (encounter.status === "ACTIVE" && oldTurnIdx >= 0) {
+        const newActiveIds = encounter.combatants
+          .filter((ec) => ec.isActive)
+          .map((ec) => ec.id);
+        const oldCurrentId = oldActiveIds[oldTurnIdx];
+        let newIdx: number;
+
+        if (oldCurrentId && newActiveIds.includes(oldCurrentId)) {
+          // Current turn combatant still exists — find its new index
+          newIdx = newActiveIds.indexOf(oldCurrentId);
+        } else {
+          // Current turn combatant was removed — advance to whoever was next
+          // Walk forward from old position to find the first surviving entry
+          newIdx = 0;
+          for (let i = 1; i <= oldActiveIds.length; i++) {
+            const candidateId = oldActiveIds[(oldTurnIdx + i) % oldActiveIds.length];
+            const found = newActiveIds.indexOf(candidateId);
+            if (found >= 0) {
+              newIdx = found;
+              break;
+            }
+          }
+        }
+
+        // Clamp
+        if (newActiveIds.length > 0) {
+          newIdx = Math.min(newIdx, newActiveIds.length - 1);
+        } else {
+          newIdx = 0;
+        }
+
+        if (newIdx !== encounter.currentTurnIdx) {
+          await prisma.encounter.update({
+            where: { id: encounterId },
+            data: { currentTurnIdx: newIdx },
+          });
+          encounter.currentTurnIdx = newIdx;
+        }
+
+        // Notify the new current-turn combatant
+        notifyCurrentTurn(io, data.joinCode, encounter);
+      }
+
+      emitEncounterUpdate(io, data.joinCode, encounter, "encounter:updated");
+    }
+
+    // If this was a PC with a connected player, notify them (keep connection alive so they can rejoin)
+    if (combatant.playerSocketId) {
+      const playerSocket = io.sockets.sockets.get(combatant.playerSocketId);
+      if (playerSocket) {
+        playerSocket.emit("player:removed");
+      }
+    }
+
+    broadcastViewerCount(io, data.joinCode);
   });
 
   // --- Encounters ---
@@ -262,7 +400,7 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
 
     const encounter = await prisma.encounter.create({
       data: {
-        name: data.name,
+        name: capitalizeFirst(data.name),
         sessionId: session.id,
         combatants: {
           create: instanceData,
@@ -843,7 +981,7 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
       // Create new PC
       const combatant = await prisma.combatant.create({
         data: {
-          name: data.name,
+          name: capitalizeFirst(data.name),
           type: "PLAYER_CHARACTER",
           initiativeBonus: data.initiativeBonus,
           maxHp: data.maxHp,
@@ -864,6 +1002,8 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
         name: combatant.name,
       });
     }
+
+    broadcastViewerCount(io, data.joinCode);
   });
 
   socket.on("player:reconnect", async (data) => {
@@ -904,6 +1044,8 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
       combatantId: updated.id,
       name: updated.name,
     });
+
+    broadcastViewerCount(io, data.joinCode);
   });
 
   // --- Disconnect cleanup ---
@@ -913,6 +1055,8 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
       where: { playerSocketId: socket.id },
       include: { encounterCombatants: true, session: true },
     });
+
+    const affectedJoinCodes = new Set<string>();
 
     for (const combatant of linked) {
       const updated = await prisma.combatant.update({
@@ -925,6 +1069,11 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
         "combatant:updated",
         updated
       );
+      affectedJoinCodes.add(combatant.session.joinCode);
+    }
+
+    for (const jc of affectedJoinCodes) {
+      broadcastViewerCount(io, jc);
     }
   });
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { Bell } from "lucide-react";
 
 export function NotificationPermission() {
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">("default");
@@ -33,6 +34,7 @@ export function NotificationPermission() {
       onClick={requestPermission}
       className="btn btn-secondary btn-sm text-xs w-full"
     >
+      <Bell size={14} />
       Enable &quot;Your Turn!&quot; Notifications
     </button>
   );

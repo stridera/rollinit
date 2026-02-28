@@ -1,6 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import {
+  Eye,
+  EyeOff,
+  Plus,
+  Minus,
+  Clock,
+  Dice6,
+  Swords,
+  CheckCircle,
+} from "lucide-react";
 import type {
   EncounterWithCombatants,
   CombatantWithInstances,
@@ -12,6 +22,13 @@ type EmitFn = <E extends keyof ClientToServerEvents>(
   event: E,
   ...args: Parameters<ClientToServerEvents[E]>
 ) => void;
+
+const STATUS_ICONS: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
+  PREPARING: Clock,
+  ROLLING: Dice6,
+  ACTIVE: Swords,
+  COMPLETED: CheckCircle,
+};
 
 export function EncounterManager({
   encounters,
@@ -84,18 +101,20 @@ export function EncounterManager({
     });
   }
 
-  function addVisible(id: string) {
-    setMonsterVisible((prev) => ({ ...prev, [id]: (prev[id] ?? 0) + 1 }));
+  function adjustCount(
+    setter: React.Dispatch<React.SetStateAction<Record<string, number>>>,
+    id: string,
+    delta: number
+  ) {
+    setter((prev) => ({
+      ...prev,
+      [id]: Math.max(0, (prev[id] ?? 0) + delta),
+    }));
   }
 
-  function addHidden(id: string) {
-    setMonsterHidden((prev) => ({ ...prev, [id]: (prev[id] ?? 0) + 1 }));
-  }
-
-  function clearMonster(id: string) {
-    setMonsterVisible((prev) => ({ ...prev, [id]: 0 }));
-    setMonsterHidden((prev) => ({ ...prev, [id]: 0 }));
-  }
+  // Summary totals
+  const totalVisible = Object.values(monsterVisible).reduce((s, n) => s + n, 0);
+  const totalHidden = Object.values(monsterHidden).reduce((s, n) => s + n, 0);
 
   const statusColors: Record<string, string> = {
     PREPARING: "text-text-muted",
@@ -134,64 +153,70 @@ export function EncounterManager({
             autoFocus
           />
 
-          {/* Monster template picker with counts */}
+          {/* Monster template picker with steppers */}
           {monsters.length > 0 && (
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <p className="text-text-muted text-xs uppercase tracking-wider">
                 Monsters
               </p>
               {monsters.map((m) => {
                 const vis = monsterVisible[m.id] ?? 0;
                 const hid = monsterHidden[m.id] ?? 0;
-                const total = vis + hid;
                 return (
-                  <div
-                    key={m.id}
-                    className="flex items-center justify-between gap-2 text-sm"
-                  >
-                    <span className="text-text-secondary truncate flex-1">
+                  <div key={m.id} className="space-y-1">
+                    <span className="text-text-secondary text-sm truncate">
                       {m.name}
                     </span>
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => addVisible(m.id)}
-                        className="btn btn-ghost btn-sm text-[10px] px-1.5 text-accent-green"
-                        title="Add visible"
-                      >
-                        + Add
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => addHidden(m.id)}
-                        className="btn btn-ghost btn-sm text-[10px] px-1.5 text-accent-purple"
-                        title="Add hidden"
-                      >
-                        + Hidden
-                      </button>
-                      <span className="w-auto min-w-[1.5rem] text-center text-sm px-1">
-                        {total === 0
-                          ? "0"
-                          : hid === 0
-                          ? `${vis}`
-                          : vis === 0
-                          ? `${hid} hidden`
-                          : `${vis} + ${hid} hidden`}
-                      </span>
-                      {total > 0 && (
+                    <div className="flex items-center gap-3 ml-2">
+                      {/* Visible stepper */}
+                      <div className="flex items-center gap-1">
+                        <Eye size={12} className="text-accent-green" />
                         <button
                           type="button"
-                          onClick={() => clearMonster(m.id)}
-                          className="btn btn-ghost btn-sm text-xs px-1.5 text-accent-red"
-                          title="Clear"
+                          onClick={() => adjustCount(setMonsterVisible, m.id, -1)}
+                          disabled={vis === 0}
+                          className="btn btn-ghost btn-sm text-xs px-1.5 py-0.5"
                         >
-                          Clear
+                          <Minus size={12} />
                         </button>
-                      )}
+                        <span className="text-sm w-5 text-center">{vis}</span>
+                        <button
+                          type="button"
+                          onClick={() => adjustCount(setMonsterVisible, m.id, 1)}
+                          className="btn btn-ghost btn-sm text-xs px-1.5 py-0.5"
+                        >
+                          <Plus size={12} />
+                        </button>
+                      </div>
+                      {/* Hidden stepper */}
+                      <div className="flex items-center gap-1">
+                        <EyeOff size={12} className="text-accent-purple" />
+                        <button
+                          type="button"
+                          onClick={() => adjustCount(setMonsterHidden, m.id, -1)}
+                          disabled={hid === 0}
+                          className="btn btn-ghost btn-sm text-xs px-1.5 py-0.5"
+                        >
+                          <Minus size={12} />
+                        </button>
+                        <span className="text-sm w-5 text-center">{hid}</span>
+                        <button
+                          type="button"
+                          onClick={() => adjustCount(setMonsterHidden, m.id, 1)}
+                          className="btn btn-ghost btn-sm text-xs px-1.5 py-0.5"
+                        >
+                          <Plus size={12} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
               })}
+              {(totalVisible > 0 || totalHidden > 0) && (
+                <p className="text-text-muted text-xs mt-1">
+                  Total: {totalVisible} visible{totalHidden > 0 ? `, ${totalHidden} hidden` : ""}
+                </p>
+              )}
             </div>
           )}
 
@@ -238,6 +263,7 @@ export function EncounterManager({
         <div className="space-y-1">
           {encounters.map((enc) => {
             const isSelected = enc.id === (selectedEncounterId ?? activeEncounterId);
+            const StatusIcon = STATUS_ICONS[enc.status] ?? Clock;
             return (
               <button
                 key={enc.id}
@@ -263,8 +289,9 @@ export function EncounterManager({
                 <div className="flex items-center justify-between">
                   <span className="font-medium">{enc.name}</span>
                   <span
-                    className={`text-xs ${statusColors[enc.status]}`}
+                    className={`text-xs flex items-center gap-1 ${statusColors[enc.status]}`}
                   >
+                    <StatusIcon size={12} />
                     {statusLabels[enc.status]}
                   </span>
                 </div>
