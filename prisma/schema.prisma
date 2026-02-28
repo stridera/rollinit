@@ -1,0 +1,100 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  joinCode  String   @unique @db.VarChar(6)
+  dmToken   String   @unique
+  isLocked  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  encounters Encounter[]
+  combatants Combatant[]
+  diceRolls  DiceRoll[]
+}
+
+enum EncounterStatus {
+  PREPARING
+  ROLLING
+  ACTIVE
+  COMPLETED
+}
+
+model Encounter {
+  id             String          @id @default(cuid())
+  name           String
+  status         EncounterStatus @default(PREPARING)
+  currentTurnIdx Int             @default(0)
+  roundNumber    Int             @default(1)
+  createdAt      DateTime        @default(now())
+
+  sessionId String
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  combatants EncounterCombatant[]
+}
+
+enum CombatantType {
+  PLAYER_CHARACTER
+  MONSTER
+  NPC
+}
+
+model Combatant {
+  id              String        @id @default(cuid())
+  name            String
+  type            CombatantType
+  initiativeBonus Int           @default(0)
+  maxHp           Int           @default(10)
+  currentHp       Int           @default(10)
+  armorClass      Int           @default(10)
+  conditions      String[]      @default([])
+  isHidden        Boolean       @default(false)
+  autoJoin        Boolean       @default(true)
+  playerSocketId  String?
+  createdAt       DateTime      @default(now())
+
+  sessionId String
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  encounterCombatants EncounterCombatant[]
+}
+
+model EncounterCombatant {
+  id              String   @id @default(cuid())
+  displayName     String
+  currentHp       Int
+  maxHp           Int
+  armorClass      Int
+  initiativeBonus Int      @default(0)
+  conditions      String[] @default([])
+  isHidden        Boolean  @default(false)
+  initiative      Int?
+  isActive        Boolean  @default(true)
+  sortOrder       Int      @default(0)
+
+  combatantId String
+  combatant   Combatant @relation(fields: [combatantId], references: [id], onDelete: Cascade)
+
+  encounterId String
+  encounter   Encounter @relation(fields: [encounterId], references: [id], onDelete: Cascade)
+}
+
+model DiceRoll {
+  id         String   @id @default(cuid())
+  notation   String
+  rolls      Int[]
+  modifier   Int      @default(0)
+  total      Int
+  rollerName String
+  isPrivate  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  sessionId String
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}

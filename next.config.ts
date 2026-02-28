@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Allow socket.io to work with the custom server
+  serverExternalPackages: ["socket.io"],
 };
 
 export default nextConfig;
