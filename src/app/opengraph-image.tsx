@@ -1,5 +1,7 @@
 import { ImageResponse } from "next/og";
 
+export const runtime = "edge";
+
 export const alt = "RollInit - D&D Initiative Tracker & Dice Roller";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
@@ -22,7 +24,7 @@ const d20DataUri = `data:image/svg+xml,${encodeURIComponent(d20Svg)}`;
 
 export default async function OpenGraphImage() {
   const medievalSharp = await fetch(
-    "https://fonts.gstatic.com/s/medievalsharp/v26/EvOJzAlL3oU5AQl2mP5KdgptAq96MwvX.ttf"
+    "https://fonts.gstatic.com/s/medievalsharp/v28/EvOJzAlL3oU5AQl2mP5KdgptAq8.ttf"
   ).then((res) => res.arrayBuffer());
 
   return new ImageResponse(
