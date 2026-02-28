@@ -1,15 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
-export async function GET(
-  _request: Request,
+export async function POST(
+  request: Request,
   { params }: { params: Promise<{ joinCode: string }> }
 ) {
   const { joinCode } = await params;
+  const body = await request.json();
+  const { password } = body;
 
   const session = await prisma.session.findUnique({
     where: { joinCode: joinCode.toUpperCase() },
-    select: { joinCode: true, createdAt: true, password: true },
+    select: { password: true },
   });
 
   if (!session) {
@@ -19,9 +21,12 @@ export async function GET(
     );
   }
 
-  return NextResponse.json({
-    valid: true,
-    joinCode: session.joinCode,
-    hasPassword: session.password != null,
-  });
+  if (session.password && session.password !== password) {
+    return NextResponse.json(
+      { error: "Incorrect password" },
+      { status: 401 }
+    );
+  }
+
+  return NextResponse.json({ valid: true });
 }

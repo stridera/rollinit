@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Crown, LogIn, Github } from "lucide-react";
+import { Crown, LogIn, Github, ArrowLeft, KeyRound } from "lucide-react";
 import { D20Icon } from "@/components/D20Icon";
 
 export default function Home() {
@@ -11,6 +11,10 @@ export default function Home() {
   const [creating, setCreating] = useState(false);
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState("");
+  const [needsPassword, setNeedsPassword] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [pendingJoinCode, setPendingJoinCode] = useState("");
 
   async function handleCreate() {
     setCreating(true);
@@ -35,7 +39,14 @@ export default function Home() {
     try {
       const res = await fetch(`/api/sessions/${code}`);
       if (res.ok) {
-        router.push(`/session/${code}`);
+        const data = await res.json();
+        if (data.hasPassword) {
+          setPendingJoinCode(data.joinCode);
+          setNeedsPassword(true);
+          setJoining(false);
+        } else {
+          router.push(`/session/${data.joinCode}`);
+        }
       } else {
         setJoinError("Session not found. Check your code and try again.");
         setJoining(false);
@@ -44,6 +55,37 @@ export default function Home() {
       setJoinError("Connection error. Please try again.");
       setJoining(false);
     }
+  }
+
+  async function handlePasswordSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!passwordInput) return;
+    setPasswordError("");
+    setJoining(true);
+
+    try {
+      const res = await fetch(`/api/sessions/${pendingJoinCode}/validate-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: passwordInput }),
+      });
+      if (res.ok) {
+        router.push(`/session/${pendingJoinCode}`);
+      } else {
+        setPasswordError("Incorrect password. Try again.");
+        setJoining(false);
+      }
+    } catch {
+      setPasswordError("Connection error. Please try again.");
+      setJoining(false);
+    }
+  }
+
+  function handleBackFromPassword() {
+    setNeedsPassword(false);
+    setPasswordInput("");
+    setPasswordError("");
+    setPendingJoinCode("");
   }
 
   return (
@@ -110,39 +152,87 @@ export default function Home() {
 
         {/* Join Session */}
         <div className="card space-y-4 border-t-2 border-t-accent-gold/40 shadow-[inset_0_1px_12px_rgba(212,168,67,0.04)]">
-          <h2 className="text-xl">Player</h2>
-          <p className="text-text-secondary text-sm">
-            Enter the code your DM shared to join the session.
-          </p>
-          <form onSubmit={handleJoin} className="space-y-3">
-            <input
-              type="text"
-              placeholder="Enter join code"
-              value={joinCode}
-              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-              maxLength={6}
-              className="w-full text-center text-2xl tracking-[0.3em] uppercase"
-              style={{ fontFamily: "var(--font-heading)" }}
-            />
-            {joinError && (
-              <p className="text-accent-red text-sm text-center">{joinError}</p>
-            )}
-            <button
-              type="submit"
-              disabled={joining || joinCode.trim().length === 0}
-              className="btn btn-secondary w-full"
-            >
-              {joining ? (
-                <span className="flex items-center gap-2">
-                  <Spinner /> Joining...
-                </span>
-              ) : (
-                <span className="flex items-center justify-center gap-2">
-                  <LogIn size={18} /> Join Session
-                </span>
-              )}
-            </button>
-          </form>
+          {needsPassword ? (
+            <>
+              <h2 className="text-xl">Enter Password</h2>
+              <p className="text-text-secondary text-sm">
+                This session requires a password to join.
+              </p>
+              <form onSubmit={handlePasswordSubmit} className="space-y-3">
+                <input
+                  type="password"
+                  placeholder="Session password"
+                  value={passwordInput}
+                  onChange={(e) => setPasswordInput(e.target.value)}
+                  className="w-full text-center"
+                  autoFocus
+                />
+                {passwordError && (
+                  <p className="text-accent-red text-sm text-center">{passwordError}</p>
+                )}
+                <button
+                  type="submit"
+                  disabled={joining || !passwordInput}
+                  className="btn btn-secondary w-full"
+                >
+                  {joining ? (
+                    <span className="flex items-center gap-2">
+                      <Spinner /> Verifying...
+                    </span>
+                  ) : (
+                    <span className="flex items-center justify-center gap-2">
+                      <KeyRound size={18} /> Submit
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleBackFromPassword}
+                  className="btn btn-ghost w-full text-sm"
+                >
+                  <span className="flex items-center justify-center gap-2">
+                    <ArrowLeft size={16} /> Back
+                  </span>
+                </button>
+              </form>
+            </>
+          ) : (
+            <>
+              <h2 className="text-xl">Player</h2>
+              <p className="text-text-secondary text-sm">
+                Enter the code your DM shared to join the session.
+              </p>
+              <form onSubmit={handleJoin} className="space-y-3">
+                <input
+                  type="text"
+                  placeholder="Enter join code"
+                  value={joinCode}
+                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                  maxLength={6}
+                  className="w-full text-center text-2xl tracking-[0.3em] uppercase"
+                  style={{ fontFamily: "var(--font-heading)" }}
+                />
+                {joinError && (
+                  <p className="text-accent-red text-sm text-center">{joinError}</p>
+                )}
+                <button
+                  type="submit"
+                  disabled={joining || joinCode.trim().length === 0}
+                  className="btn btn-secondary w-full"
+                >
+                  {joining ? (
+                    <span className="flex items-center gap-2">
+                      <Spinner /> Joining...
+                    </span>
+                  ) : (
+                    <span className="flex items-center justify-center gap-2">
+                      <LogIn size={18} /> Join Session
+                    </span>
+                  )}
+                </button>
+              </form>
+            </>
+          )}
         </div>
 
         {/* Footer */}

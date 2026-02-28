@@ -24,6 +24,7 @@ export function InitiativeList({
   emit,
   readOnly,
   playerCombatantId,
+  physicalDice,
 }: {
   encounter: EncounterWithCombatants;
   isDM: boolean;
@@ -31,6 +32,7 @@ export function InitiativeList({
   emit: EmitFn;
   readOnly?: boolean;
   playerCombatantId?: string | null;
+  physicalDice?: boolean;
 }) {
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
@@ -99,6 +101,7 @@ export function InitiativeList({
                 emit={emit}
                 readOnly={readOnly}
                 playerCombatantId={playerCombatantId}
+                physicalDice={physicalDice}
                 draggable={canDrag}
                 isDragOver={dragOverIdx === dragIdx}
                 positionLabel={positionLabel}
@@ -186,6 +189,7 @@ function InitiativeCard({
   isDragOver,
   positionLabel,
   playerCombatantId,
+  physicalDice,
   onDragStart,
   onDragOver,
   onDragEnd,
@@ -203,6 +207,7 @@ function InitiativeCard({
   isDragOver?: boolean;
   positionLabel?: string | null;
   playerCombatantId?: string | null;
+  physicalDice?: boolean;
   onDragStart?: () => void;
   onDragOver?: (e: React.DragEvent) => void;
   onDragEnd?: () => void;
@@ -318,7 +323,7 @@ function InitiativeCard({
         <div className="flex items-center gap-2">
           {!readOnly && isRolling && entry.initiative === null && (isDM || entry.combatantId === playerCombatantId) && (
             <>
-              {isDM && (
+              {(isDM || physicalDice) && (
                 <div className="flex items-center gap-1">
                   <input
                     type="number"

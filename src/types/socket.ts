@@ -21,6 +21,8 @@ export type EncounterWithCombatants = Encounter & {
 export type SessionState = {
   joinCode: string;
   isLocked: boolean;
+  hasPassword: boolean;
+  physicalDice: boolean;
   combatants: CombatantWithInstances[];
   encounters: EncounterWithCombatants[];
   activeEncounterId: string | null;
@@ -161,6 +163,12 @@ export type PlayerRegisterPayload = {
   armorClass: number;
 };
 export type PlayerReconnectPayload = { joinCode: string; combatantId: string };
+export type UpdateSettingsPayload = {
+  joinCode: string;
+  dmToken: string;
+  settings: { password?: string | null; physicalDice?: boolean };
+};
+export type ValidatePasswordPayload = { joinCode: string; password: string };
 
 // Server -> Client events
 export interface ServerToClientEvents {
@@ -181,6 +189,9 @@ export interface ServerToClientEvents {
   "player:registered": (data: { combatantId: string; name: string }) => void;
   "player:removed": () => void;
   "session:viewerCount": (data: { spectators: number; players: number }) => void;
+  "session:settingsChanged": (data: { hasPassword: boolean; physicalDice: boolean }) => void;
+  "session:passwordValid": () => void;
+  "session:dmSettings": (data: { password: string | null; physicalDice: boolean }) => void;
   error: (message: string) => void;
 }
 
@@ -209,4 +220,7 @@ export interface ClientToServerEvents {
   "session:regenerateCode": (data: RegenerateCodePayload) => void;
   "player:register": (data: PlayerRegisterPayload) => void;
   "player:reconnect": (data: PlayerReconnectPayload) => void;
+  "session:updateSettings": (data: UpdateSettingsPayload) => void;
+  "session:validatePassword": (data: ValidatePasswordPayload) => void;
+  "session:getSettings": (data: { joinCode: string; dmToken: string }) => void;
 }

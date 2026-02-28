@@ -10,8 +10,10 @@ model Session {
   id        String   @id @default(cuid())
   joinCode  String   @unique @db.VarChar(6)
   dmToken   String   @unique
-  isLocked  Boolean  @default(false)
-  createdAt DateTime @default(now())
+  isLocked     Boolean  @default(false)
+  password     String?
+  physicalDice Boolean  @default(false)
+  createdAt    DateTime @default(now())
 
   encounters Encounter[]
   combatants Combatant[]

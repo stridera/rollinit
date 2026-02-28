@@ -184,6 +184,13 @@ export function PlayerView({ joinCode }: { joinCode: string }) {
       setViewerCount(data);
     }
 
+    function onSettingsChanged(data: { hasPassword: boolean; physicalDice: boolean }) {
+      setSessionState((prev) => {
+        if (!prev) return prev;
+        return { ...prev, hasPassword: data.hasPassword, physicalDice: data.physicalDice };
+      });
+    }
+
     socket.on("combatant:added", onCombatantAdded);
     socket.on("combatant:updated", onCombatantUpdated);
     socket.on("combatant:removed", onCombatantRemoved);
@@ -196,6 +203,7 @@ export function PlayerView({ joinCode }: { joinCode: string }) {
     socket.on("notify:yourTurn", onYourTurn);
     socket.on("player:removed", onPlayerRemoved);
     socket.on("session:viewerCount", onViewerCount);
+    socket.on("session:settingsChanged", onSettingsChanged);
 
     return () => {
       socket.off("combatant:added", onCombatantAdded);
@@ -210,6 +218,7 @@ export function PlayerView({ joinCode }: { joinCode: string }) {
       socket.off("notify:yourTurn", onYourTurn);
       socket.off("player:removed", onPlayerRemoved);
       socket.off("session:viewerCount", onViewerCount);
+      socket.off("session:settingsChanged", onSettingsChanged);
     };
   }, [socket, setSessionState, joinCode]);
 
@@ -393,6 +402,7 @@ export function PlayerView({ joinCode }: { joinCode: string }) {
             joinCode={joinCode}
             emit={emit}
             playerCombatantId={combatantId}
+            physicalDice={sessionState?.physicalDice}
           />
         )}
 

@@ -12,6 +12,7 @@ import {
   Dice6,
   Github,
   Eye,
+  Settings,
 } from "lucide-react";
 import type { CombatantWithInstances, EncounterWithCombatants } from "@/types/socket";
 import { ConnectionStatus } from "./ConnectionStatus";
@@ -22,6 +23,7 @@ import { CombatControls } from "./CombatControls";
 import { InitiativeList } from "./InitiativeList";
 import { DiceRoller } from "./DiceRoller";
 import { DiceLog } from "./DiceLog";
+import { DMSettingsModal } from "./DMSettingsModal";
 
 type MobileTab = "combatants" | "combat" | "dice";
 
@@ -39,6 +41,7 @@ export function DMDashboard({
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileTab>("combat");
   const [viewerCount, setViewerCount] = useState<{ spectators: number; players: number } | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   function handleCopyCode() {
     if (navigator.clipboard?.writeText) {
@@ -145,6 +148,13 @@ export function DMDashboard({
       setViewerCount(data);
     }
 
+    function onSettingsChanged(data: { hasPassword: boolean; physicalDice: boolean }) {
+      setSessionState((prev) => {
+        if (!prev) return prev;
+        return { ...prev, hasPassword: data.hasPassword, physicalDice: data.physicalDice };
+      });
+    }
+
     socket.on("combatant:added", onCombatantAdded);
     socket.on("combatant:updated", onCombatantUpdated);
     socket.on("combatant:removed", onCombatantRemoved);
@@ -156,6 +166,7 @@ export function DMDashboard({
     socket.on("session:lockChanged", onLockChanged);
     socket.on("session:codeRegenerated", onCodeRegenerated);
     socket.on("session:viewerCount", onViewerCount);
+    socket.on("session:settingsChanged", onSettingsChanged);
 
     return () => {
       socket.off("combatant:added", onCombatantAdded);
@@ -169,6 +180,7 @@ export function DMDashboard({
       socket.off("session:lockChanged", onLockChanged);
       socket.off("session:codeRegenerated", onCodeRegenerated);
       socket.off("session:viewerCount", onViewerCount);
+      socket.off("session:settingsChanged", onSettingsChanged);
     };
   }, [socket, setSessionState]);
 
@@ -243,6 +255,13 @@ export function DMDashboard({
             >
               <RefreshCw size={16} className={confirmRegenerate ? "animate-spin" : ""} />
             </button>
+            <button
+              onClick={() => setSettingsOpen(true)}
+              className="p-1.5 rounded text-text-muted hover:text-text-secondary transition-colors"
+              title="Session settings"
+            >
+              <Settings size={16} />
+            </button>
             <a
               href="https://github.com/stridera/rollinit/issues"
               target="_blank"
@@ -308,6 +327,7 @@ export function DMDashboard({
                   joinCode={joinCode}
                   emit={emit}
                   readOnly={isViewingCompleted}
+                  physicalDice={sessionState?.physicalDice}
                 />
               </>
             )}
@@ -387,6 +407,15 @@ export function DMDashboard({
           </div>
         </details>
       </div>
+
+      <DMSettingsModal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        socket={socket}
+        emit={emit}
+        joinCode={joinCode}
+        dmToken={dmToken}
+      />
     </div>
   );
 }

@@ -50,6 +50,8 @@ async function getSessionState(joinCode: string): Promise<SessionState | null> {
   return {
     joinCode: session.joinCode,
     isLocked: session.isLocked,
+    hasPassword: session.password != null,
+    physicalDice: session.physicalDice,
     combatants: session.combatants,
     encounters: session.encounters,
     activeEncounterId: activeEncounter?.id ?? null,
@@ -501,7 +503,7 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
   socket.on("combat:rollInitiative", async (data) => {
     const instance = await prisma.encounterCombatant.findUnique({
       where: { id: data.instanceId },
-      include: { encounter: true, combatant: true },
+      include: { encounter: { include: { session: true } }, combatant: true },
     });
 
     if (!instance) return;
@@ -513,10 +515,17 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
         socket.emit("error", "You can only roll initiative for your own character");
         return;
       }
-      // Players cannot set manual values
+      // Players can only set manual values when physical dice mode is enabled
       if (data.value !== undefined) {
-        socket.emit("error", "Only the DM can set manual initiative values");
-        return;
+        if (!instance.encounter.session.physicalDice) {
+          socket.emit("error", "Only the DM can set manual initiative values");
+          return;
+        }
+        // Validate the value is an integer 1-20
+        if (!Number.isInteger(data.value) || data.value < 1 || data.value > 20) {
+          socket.emit("error", "Manual roll must be an integer between 1 and 20");
+          return;
+        }
       }
     }
 
@@ -943,6 +952,66 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
       s.join(`session:${newCode}`);
       s.join(`dm:${newCode}`);
     }
+  });
+
+  // --- Session Settings ---
+  socket.on("session:getSettings", async (data) => {
+    const session = await prisma.session.findUnique({
+      where: { joinCode: data.joinCode },
+    });
+    if (!session || session.dmToken !== data.dmToken) {
+      socket.emit("error", "Unauthorized");
+      return;
+    }
+    socket.emit("session:dmSettings", {
+      password: session.password,
+      physicalDice: session.physicalDice,
+    });
+  });
+
+  socket.on("session:updateSettings", async (data) => {
+    const session = await prisma.session.findUnique({
+      where: { joinCode: data.joinCode },
+    });
+    if (!session || session.dmToken !== data.dmToken) {
+      socket.emit("error", "Unauthorized");
+      return;
+    }
+
+    const updateData: { password?: string | null; physicalDice?: boolean } = {};
+    if (data.settings.password !== undefined) {
+      updateData.password = data.settings.password || null;
+    }
+    if (data.settings.physicalDice !== undefined) {
+      updateData.physicalDice = data.settings.physicalDice;
+    }
+
+    const updated = await prisma.session.update({
+      where: { id: session.id },
+      data: updateData,
+    });
+
+    const settingsData = {
+      hasPassword: updated.password != null,
+      physicalDice: updated.physicalDice,
+    };
+    io.to(`session:${data.joinCode}`).emit("session:settingsChanged", settingsData);
+    io.to(`dm:${data.joinCode}`).emit("session:settingsChanged", settingsData);
+  });
+
+  socket.on("session:validatePassword", async (data) => {
+    const session = await prisma.session.findUnique({
+      where: { joinCode: data.joinCode },
+    });
+    if (!session) {
+      socket.emit("error", "Session not found");
+      return;
+    }
+    if (session.password && session.password !== data.password) {
+      socket.emit("error", "Incorrect password");
+      return;
+    }
+    socket.emit("session:passwordValid");
   });
 
   // --- Player Registration ---
