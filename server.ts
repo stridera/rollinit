@@ -3,10 +3,21 @@ import { createServer } from "http";
 import next from "next";
 import { Server } from "socket.io";
 import { registerSocketHandlers } from "./src/lib/socketHandlers";
+import { prisma } from "./src/lib/db";
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
 } from "./src/types/socket";
+
+async function cleanupStaleSessions() {
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const deleted = await prisma.session.deleteMany({
+    where: { lastActiveAt: { lt: thirtyDaysAgo } },
+  });
+  if (deleted.count > 0) {
+    console.log(`[Cleanup] Deleted ${deleted.count} stale sessions`);
+  }
+}
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = process.env.HOSTNAME || "localhost";
@@ -47,5 +58,9 @@ app.prepare().then(() => {
 
   httpServer.listen(port, () => {
     console.log(`> Ready on http://${hostname}:${port}`);
+
+    // Cleanup stale sessions on startup and every 24 hours
+    cleanupStaleSessions();
+    setInterval(cleanupStaleSessions, 24 * 60 * 60 * 1000);
   });
 });

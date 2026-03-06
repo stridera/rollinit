@@ -14,6 +14,7 @@ model Session {
   password         String?
   physicalDice     Boolean  @default(false)
   showMonsterHpBar Boolean  @default(true)
+  lastActiveAt DateTime @default(now())
   createdAt    DateTime @default(now())
 
   encounters Encounter[]

@@ -21,7 +21,7 @@ const WAITING_MESSAGES = [
 ];
 
 export function DashboardView({ joinCode }: { joinCode: string }) {
-  const { socket, connected, sessionState, setSessionState } =
+  const { socket, connected, sessionState, setSessionState, dmActive } =
     useSocket(joinCode, false);
   const fullscreen = useFullscreen();
   const wakeLock = useWakeLock();
@@ -159,8 +159,8 @@ export function DashboardView({ joinCode }: { joinCode: string }) {
 
   const showMonsterHpBar = sessionState?.showMonsterHpBar;
 
-  // Waiting state
-  if (!activeEncounter) {
+  // Waiting state (DM not connected or no active encounter)
+  if (dmActive === false || !activeEncounter) {
     return (
       <div className="h-dvh flex flex-col bg-bg-primary relative z-10">
         {/* Top bar */}

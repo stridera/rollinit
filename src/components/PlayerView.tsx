@@ -41,7 +41,7 @@ export function PlayerView({ joinCode }: { joinCode: string }) {
   const [initBonusInput, setInitBonusInput] = useState(0);
   const [acInput, setAcInput] = useState(10);
 
-  const { socket, connected, sessionState, setSessionState, error, emit } =
+  const { socket, connected, sessionState, setSessionState, dmActive, error, emit } =
     useSocket(joinCode, false);
   const fullscreen = useFullscreen();
   const wakeLock = useWakeLock();
@@ -267,6 +267,37 @@ export function PlayerView({ joinCode }: { joinCode: string }) {
       <div className="min-h-dvh flex items-center justify-center p-4 relative z-10">
         <div className="card w-full max-w-sm text-center py-8">
           <p className="text-text-secondary">Reconnecting...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show waiting screen when DM is not connected
+  if (dmActive === false && !hasJoined) {
+    return (
+      <div className="min-h-dvh flex items-center justify-center p-4 relative z-10">
+        <div className="card w-full max-w-sm text-center py-12 relative overflow-hidden">
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background: "radial-gradient(ellipse at center, rgba(212, 168, 67, 0.06) 0%, transparent 60%)",
+              animation: "torchFlicker 3s ease-in-out infinite",
+            }}
+          />
+          <div className="relative">
+            <D20Icon size={48} className="text-accent-gold mx-auto mb-4 opacity-30" />
+            <h2 className="text-xl mb-2">Waiting for DM</h2>
+            <p className="text-text-secondary text-sm mb-1">
+              Session <span className="text-accent-gold tracking-wider">{joinCode}</span>
+            </p>
+            <p
+              key={waitingMsgIdx}
+              className="text-text-muted text-xs italic mt-4 animate-fade-in"
+            >
+              {WAITING_MESSAGES[waitingMsgIdx]}
+            </p>
+            <ConnectionStatus connected={connected} />
+          </div>
         </div>
       </div>
     );

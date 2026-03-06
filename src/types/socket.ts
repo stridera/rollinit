@@ -202,6 +202,7 @@ export interface ServerToClientEvents {
   "session:settingsChanged": (data: { hasPassword: boolean; physicalDice: boolean; showMonsterHpBar: boolean }) => void;
   "session:passwordValid": () => void;
   "session:dmSettings": (data: { password: string | null; physicalDice: boolean; showMonsterHpBar: boolean }) => void;
+  "session:dmStatus": (data: { active: boolean }) => void;
   error: (message: string) => void;
 }
 

@@ -138,23 +138,60 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
     }
 
     socket.join(`session:${joinCode}`);
-    if (isDM) socket.join(`dm:${joinCode}`);
-
-    const state = await getSessionState(joinCode);
-    if (!state) return;
+    socket.data.joinCodes = socket.data.joinCodes || new Set<string>();
+    socket.data.joinCodes.add(joinCode);
 
     if (isDM) {
-      socket.emit("session:state", state);
+      socket.join(`dm:${joinCode}`);
+      socket.data.dmCodes = socket.data.dmCodes || new Set<string>();
+      socket.data.dmCodes.add(joinCode);
+
+      // Update last active timestamp
+      await prisma.session.update({
+        where: { joinCode },
+        data: { lastActiveAt: new Date() },
+      });
+
+      const state = await getSessionState(joinCode);
+      if (state) {
+        socket.emit("session:state", state);
+        // Broadcast to players that DM is now active + send them state
+        const playerState = filterStateForPlayers(state);
+        socket.to(`session:${joinCode}`).emit("session:state", playerState);
+      }
+      io.to(`session:${joinCode}`).emit("session:dmStatus", { active: true });
     } else {
-      socket.emit("session:state", filterStateForPlayers(state));
+      // Check if DM is currently connected
+      const dmSockets = await io.in(`dm:${joinCode}`).fetchSockets();
+      const dmActive = dmSockets.length > 0;
+      socket.emit("session:dmStatus", { active: dmActive });
+
+      if (dmActive) {
+        const state = await getSessionState(joinCode);
+        if (state) {
+          socket.emit("session:state", filterStateForPlayers(state));
+        }
+      }
+      // If DM not active, player waits — they'll get state when DM connects
     }
 
     broadcastViewerCount(io, joinCode);
   });
 
-  socket.on("session:leave", ({ joinCode }) => {
+  socket.on("session:leave", async ({ joinCode }) => {
+    const wasDM = socket.rooms.has(`dm:${joinCode}`);
     socket.leave(`session:${joinCode}`);
     socket.leave(`dm:${joinCode}`);
+    socket.data.joinCodes?.delete(joinCode);
+    socket.data.dmCodes?.delete(joinCode);
+
+    if (wasDM) {
+      const dmSockets = await io.in(`dm:${joinCode}`).fetchSockets();
+      if (dmSockets.length === 0) {
+        io.to(`session:${joinCode}`).emit("session:dmStatus", { active: false });
+      }
+    }
+
     broadcastViewerCount(io, joinCode);
   });
 
@@ -944,17 +981,14 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
 
     // Generate a new unique code
     let newCode: string;
-    let attempts = 0;
-    do {
-      newCode = generateJoinCode();
-      const existing = await prisma.session.findUnique({
-        where: { joinCode: newCode },
-      });
-      if (!existing) break;
-      attempts++;
-    } while (attempts < 10);
-
-    if (attempts >= 10) {
+    try {
+      const usedCodes = new Set(
+        (await prisma.session.findMany({ select: { joinCode: true } })).map(
+          (s) => s.joinCode
+        )
+      );
+      newCode = generateJoinCode(usedCodes);
+    } catch {
       socket.emit("error", "Failed to generate unique code");
       return;
     }
@@ -1067,6 +1101,14 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
       socket.emit("error", "Session not found");
       return;
     }
+
+    // DM must be connected for players to register
+    const dmSockets = await io.in(`dm:${data.joinCode}`).fetchSockets();
+    if (dmSockets.length === 0) {
+      socket.emit("error", "The DM is not currently connected");
+      return;
+    }
+
     if (session.isLocked) {
       socket.emit("error", "Session is locked");
       return;
@@ -1237,13 +1279,26 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
 
   // --- Disconnect cleanup ---
   socket.on("disconnect", async () => {
+    // Broadcast DM status for any sessions where this was the DM
+    const dmCodes = socket.data.dmCodes as Set<string> | undefined;
+    if (dmCodes) {
+      for (const joinCode of dmCodes) {
+        const remainingDm = await io.in(`dm:${joinCode}`).fetchSockets();
+        if (remainingDm.length === 0) {
+          io.to(`session:${joinCode}`).emit("session:dmStatus", { active: false });
+        }
+      }
+    }
+
     // Find all combatants this socket was linked to
     const linked = await prisma.combatant.findMany({
       where: { playerSocketId: socket.id },
       include: { encounterCombatants: true, session: true },
     });
 
-    const affectedJoinCodes = new Set<string>();
+    const affectedJoinCodes = new Set<string>(
+      socket.data.joinCodes as Set<string> | undefined
+    );
 
     for (const combatant of linked) {
       const updated = await prisma.combatant.update({

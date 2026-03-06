@@ -8,6 +8,7 @@ export function useSocket(joinCode: string, isDM: boolean = false) {
   const socketRef = useRef<AppSocket | null>(null);
   const [connected, setConnected] = useState(false);
   const [sessionState, setSessionState] = useState<SessionState | null>(null);
+  const [dmActive, setDmActive] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -32,6 +33,10 @@ export function useSocket(joinCode: string, isDM: boolean = false) {
       setSessionState(state);
     }
 
+    function onDmStatus(data: { active: boolean }) {
+      setDmActive(data.active);
+    }
+
     let errorTimer: ReturnType<typeof setTimeout>;
     function onError(msg: string) {
       setError(msg);
@@ -42,6 +47,7 @@ export function useSocket(joinCode: string, isDM: boolean = false) {
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
     socket.on("session:state", onState);
+    socket.on("session:dmStatus", onDmStatus);
     socket.on("error", onError);
 
     // If already connected, join immediately
@@ -54,6 +60,7 @@ export function useSocket(joinCode: string, isDM: boolean = false) {
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
       socket.off("session:state", onState);
+      socket.off("session:dmStatus", onDmStatus);
       socket.off("error", onError);
       socket.emit("session:leave", { joinCode });
     };
@@ -69,5 +76,5 @@ export function useSocket(joinCode: string, isDM: boolean = false) {
     []
   );
 
-  return { socket: socketRef.current, connected, sessionState, setSessionState, error, emit };
+  return { socket: socketRef.current, connected, sessionState, setSessionState, dmActive, error, emit };
 }
