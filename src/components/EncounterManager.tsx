@@ -55,7 +55,7 @@ export function EncounterManager({
 
   const monsters = combatants.filter((c) => c.type === "MONSTER");
   const pcsAndNpcs = combatants.filter(
-    (c) => c.type === "PLAYER_CHARACTER" || c.type === "NPC"
+    (c) => c.type === "PLAYER_CHARACTER" || c.type === "NPC" || c.type === "COMPANION"
   );
 
   function handleCreate(e: React.FormEvent) {

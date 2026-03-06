@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Ghost, User, Plus } from "lucide-react";
+import { Ghost, User, Plus, PawPrint } from "lucide-react";
 import type { CombatantType } from "@prisma/client";
-import type { ClientToServerEvents } from "@/types/socket";
+import type { ClientToServerEvents, CombatantWithInstances } from "@/types/socket";
 import { SRD_MONSTERS, type SrdMonster } from "@/data/srd-monsters";
 
 type EmitFn = <E extends keyof ClientToServerEvents>(
@@ -14,11 +14,15 @@ type EmitFn = <E extends keyof ClientToServerEvents>(
 export function AddCombatantForm({
   joinCode,
   emit,
+  combatants,
 }: {
   joinCode: string;
   emit: EmitFn;
+  combatants?: CombatantWithInstances[];
 }) {
-  const [tab, setTab] = useState<"MONSTER" | "PLAYER_CHARACTER">("MONSTER");
+  const [tab, setTab] = useState<"MONSTER" | "CHARACTER" | "COMPANION">("MONSTER");
+  const [isNpc, setIsNpc] = useState(false);
+  const [ownerId, setOwnerId] = useState("");
   const [name, setName] = useState("");
   const [initiativeBonus, setInitiativeBonus] = useState(0);
   const [maxHp, setMaxHp] = useState(10);
@@ -61,14 +65,21 @@ export function AddCombatantForm({
     e.preventDefault();
     if (!name.trim()) return;
 
+    const type: CombatantType =
+      tab === "MONSTER" ? "MONSTER"
+      : tab === "COMPANION" ? "COMPANION"
+      : isNpc ? "NPC"
+      : "PLAYER_CHARACTER";
+
     emit("combatant:add", {
       joinCode,
       name: name.trim(),
-      type: tab as CombatantType,
+      type,
       initiativeBonus,
       maxHp,
       armorClass,
       isHidden: false,
+      ...(tab === "COMPANION" && ownerId ? { ownerId } : {}),
     });
 
     setName("");
@@ -76,6 +87,7 @@ export function AddCombatantForm({
     setMaxHp(10);
     setArmorClass(10);
     setSearch("");
+    setOwnerId("");
   }
 
   return (
@@ -97,14 +109,25 @@ export function AddCombatantForm({
         </button>
         <button
           className={`flex-1 py-1.5 px-3 rounded-md text-sm transition-colors flex items-center justify-center gap-1.5 ${
-            tab === "PLAYER_CHARACTER"
+            tab === "CHARACTER"
               ? "bg-bg-card text-accent-gold"
               : "text-text-muted hover:text-text-secondary"
           }`}
-          onClick={() => setTab("PLAYER_CHARACTER")}
+          onClick={() => setTab("CHARACTER")}
         >
           <User size={14} />
-          Player Character
+          Character
+        </button>
+        <button
+          className={`flex-1 py-1.5 px-3 rounded-md text-sm transition-colors flex items-center justify-center gap-1.5 ${
+            tab === "COMPANION"
+              ? "bg-bg-card text-accent-gold"
+              : "text-text-muted hover:text-text-secondary"
+          }`}
+          onClick={() => setTab("COMPANION")}
+        >
+          <PawPrint size={14} />
+          Companion
         </button>
       </div>
 
@@ -150,9 +173,43 @@ export function AddCombatantForm({
           </div>
         )}
 
+        {/* NPC toggle for character tab */}
+        {tab === "CHARACTER" && (
+          <label className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer">
+            <input
+              type="checkbox"
+              checked={isNpc}
+              onChange={(e) => setIsNpc(e.target.checked)}
+              className="accent-accent-gold"
+            />
+            NPC (DM-controlled)
+          </label>
+        )}
+
+        {/* Owner picker for companions */}
+        {tab === "COMPANION" && (
+          <div>
+            <label className="text-xs text-text-muted block mb-1">Owner</label>
+            <select
+              value={ownerId}
+              onChange={(e) => setOwnerId(e.target.value)}
+              className="w-full text-sm"
+            >
+              <option value="">Select owner...</option>
+              {(combatants ?? [])
+                .filter((c) => c.type === "PLAYER_CHARACTER" || c.type === "NPC")
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+        )}
+
         <input
           type="text"
-          placeholder={tab === "MONSTER" ? "Goblin" : "Gandalf"}
+          placeholder={tab === "COMPANION" ? "Familiar name" : tab === "MONSTER" ? "Goblin" : isNpc ? "Guard Captain" : "Gandalf"}
           value={name}
           onChange={(e) => setName(e.target.value)}
           className="w-full"
@@ -191,9 +248,13 @@ export function AddCombatantForm({
           </div>
         </div>
 
-        <button type="submit" className="btn btn-primary w-full">
+        <button
+          type="submit"
+          className="btn btn-primary w-full"
+          disabled={tab === "COMPANION" && !ownerId}
+        >
           <Plus size={18} />
-          Add {tab === "MONSTER" ? "Monster" : "Character"}
+          Add {tab === "MONSTER" ? "Monster" : tab === "COMPANION" ? "Companion" : isNpc ? "NPC" : "Character"}
         </button>
       </form>
     </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Eye, LogIn, Github, Users } from "lucide-react";
+import { Eye, LogIn, Github, Users, Maximize2, Minimize2, MonitorSmartphone, ChevronDown, ChevronUp } from "lucide-react";
 import { useSocket } from "@/lib/useSocket";
 import type { CombatantWithInstances, EncounterWithCombatants } from "@/types/socket";
 import { ConnectionStatus } from "./ConnectionStatus";
@@ -11,6 +11,8 @@ import { DiceRoller } from "./DiceRoller";
 import { DiceLog } from "./DiceLog";
 import { NotificationPermission } from "./NotificationPermission";
 import { D20Icon } from "./D20Icon";
+import { useFullscreen } from "@/hooks/useFullscreen";
+import { useWakeLock } from "@/hooks/useWakeLock";
 
 const STORAGE_KEY_PREFIX = "rollinit:player:";
 
@@ -41,6 +43,15 @@ export function PlayerView({ joinCode }: { joinCode: string }) {
 
   const { socket, connected, sessionState, setSessionState, error, emit } =
     useSocket(joinCode, false);
+  const fullscreen = useFullscreen();
+  const wakeLock = useWakeLock();
+
+  // Companion form state
+  const [showCompanionForm, setShowCompanionForm] = useState(false);
+  const [companionName, setCompanionName] = useState("");
+  const [companionHp, setCompanionHp] = useState(10);
+  const [companionInit, setCompanionInit] = useState(0);
+  const [companionAc, setCompanionAc] = useState(10);
 
   // Cycle waiting messages
   useEffect(() => {
@@ -184,10 +195,10 @@ export function PlayerView({ joinCode }: { joinCode: string }) {
       setViewerCount(data);
     }
 
-    function onSettingsChanged(data: { hasPassword: boolean; physicalDice: boolean }) {
+    function onSettingsChanged(data: { hasPassword: boolean; physicalDice: boolean; showMonsterHpBar: boolean }) {
       setSessionState((prev) => {
         if (!prev) return prev;
-        return { ...prev, hasPassword: data.hasPassword, physicalDice: data.physicalDice };
+        return { ...prev, hasPassword: data.hasPassword, physicalDice: data.physicalDice, showMonsterHpBar: data.showMonsterHpBar };
       });
     }
 
@@ -349,6 +360,14 @@ export function PlayerView({ joinCode }: { joinCode: string }) {
             <Eye size={14} />
             Spectate Only
           </button>
+
+          <a
+            href={`?mode=dashboard`}
+            className="btn btn-ghost w-full text-xs text-text-muted"
+          >
+            <Maximize2 size={14} />
+            Dashboard Mode
+          </a>
         </div>
       </div>
     );
@@ -366,6 +385,26 @@ export function PlayerView({ joinCode }: { joinCode: string }) {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            {wakeLock.isSupported && (
+              <button
+                onClick={wakeLock.toggle}
+                className={`p-1.5 rounded transition-colors ${
+                  wakeLock.isActive ? "text-accent-gold" : "text-text-muted hover:text-text-secondary"
+                }`}
+                title={wakeLock.isActive ? "Disable wake lock" : "Keep screen on"}
+              >
+                <MonitorSmartphone size={16} />
+              </button>
+            )}
+            {fullscreen.isSupported && (
+              <button
+                onClick={fullscreen.toggle}
+                className="p-1.5 rounded text-text-muted hover:text-text-secondary transition-colors"
+                title={fullscreen.isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+              >
+                {fullscreen.isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+              </button>
+            )}
             <a
               href="https://github.com/stridera/rollinit/issues"
               target="_blank"
@@ -391,7 +430,24 @@ export function PlayerView({ joinCode }: { joinCode: string }) {
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
         {/* Current Turn Banner */}
         {activeEncounter && activeEncounter.status === "ACTIVE" && (
-          <CurrentTurnBanner encounter={activeEncounter} />
+          <CurrentTurnBanner
+            encounter={activeEncounter}
+            showMonsterHpBar={sessionState?.showMonsterHpBar}
+            showHpControls={(() => {
+              const activeEntries = activeEncounter.combatants.filter((ec) => ec.isActive);
+              const current = activeEntries[activeEncounter.currentTurnIdx];
+              if (!current) return false;
+              return !!(combatantId && (current.combatantId === combatantId || current.combatant.ownerId === combatantId));
+            })()}
+            onHpChange={(instanceId, newHp) => {
+              emit("instance:update", {
+                joinCode,
+                encounterId: activeEncounter.id,
+                instanceId,
+                updates: { currentHp: newHp },
+              });
+            }}
+          />
         )}
 
         {/* Initiative List */}
@@ -403,6 +459,8 @@ export function PlayerView({ joinCode }: { joinCode: string }) {
             emit={emit}
             playerCombatantId={combatantId}
             physicalDice={sessionState?.physicalDice}
+            showMonsterHpBar={sessionState?.showMonsterHpBar}
+            hideCurrentTurn
           />
         )}
 
@@ -444,6 +502,95 @@ export function PlayerView({ joinCode }: { joinCode: string }) {
 
         {/* Notification permission */}
         <NotificationPermission />
+
+        {/* Companion form -- only for registered players */}
+        {combatantId && (
+          <div className="card space-y-3">
+            <button
+              onClick={() => setShowCompanionForm(!showCompanionForm)}
+              className="flex items-center justify-between w-full text-sm text-text-secondary"
+            >
+              <span>Companions / Familiars</span>
+              {showCompanionForm ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+            {showCompanionForm && (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!companionName.trim()) return;
+                  emit("player:addCompanion", {
+                    joinCode,
+                    ownerCombatantId: combatantId,
+                    name: companionName.trim(),
+                    maxHp: companionHp,
+                    initiativeBonus: companionInit,
+                    armorClass: companionAc,
+                  });
+                  setCompanionName("");
+                  setCompanionHp(10);
+                  setCompanionInit(0);
+                  setCompanionAc(10);
+                }}
+                className="space-y-2 animate-fade-in"
+              >
+                <input
+                  type="text"
+                  placeholder="Companion name"
+                  value={companionName}
+                  onChange={(e) => setCompanionName(e.target.value)}
+                  className="w-full text-sm"
+                />
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-[10px] text-text-muted">Max HP</label>
+                    <input
+                      type="number"
+                      value={companionHp}
+                      onChange={(e) => setCompanionHp(Number(e.target.value))}
+                      className="w-full text-sm text-center"
+                      min={1}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-text-muted">Init Bonus</label>
+                    <input
+                      type="number"
+                      value={companionInit}
+                      onChange={(e) => setCompanionInit(Number(e.target.value))}
+                      className="w-full text-sm text-center"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-text-muted">AC</label>
+                    <input
+                      type="number"
+                      value={companionAc}
+                      onChange={(e) => setCompanionAc(Number(e.target.value))}
+                      className="w-full text-sm text-center"
+                    />
+                  </div>
+                </div>
+                <button
+                  type="submit"
+                  disabled={!companionName.trim()}
+                  className="btn btn-secondary btn-sm w-full"
+                >
+                  Add Companion
+                </button>
+                {/* Show existing companions */}
+                {sessionState?.combatants
+                  .filter((c) => c.type === "COMPANION" && c.ownerId === combatantId)
+                  .map((c) => (
+                    <div key={c.id} className="flex items-center justify-between text-sm text-text-secondary py-1 px-2 bg-bg-tertiary rounded">
+                      <span className="text-amber-400 text-[10px] mr-1.5">CMP</span>
+                      <span className="flex-1">{c.name}</span>
+                      <span className="text-xs text-text-muted">{c.currentHp}/{c.maxHp} HP</span>
+                    </div>
+                  ))}
+              </form>
+            )}
+          </div>
+        )}
 
         {/* Dice Roller + Log -- only for registered players */}
         {combatantId && (

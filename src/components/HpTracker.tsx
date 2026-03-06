@@ -25,12 +25,14 @@ export function HpTracker({
   onHpChange,
   showControls,
   showExact,
+  hideBar,
 }: {
   currentHp: number;
   maxHp: number;
   onHpChange: (newHp: number) => void;
   showControls: boolean;
   showExact: boolean;
+  hideBar?: boolean;
 }) {
   const [hpDelta, setHpDelta] = useState("");
   const [deathFlash, setDeathFlash] = useState(false);
@@ -75,7 +77,7 @@ export function HpTracker({
           <div
             className="h-full rounded-full transition-all duration-300"
             style={{
-              width: `${pct}%`,
+              width: hideBar ? "100%" : `${pct}%`,
               backgroundColor: getHpColor(currentHp, maxHp),
             }}
           />

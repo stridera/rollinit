@@ -10,6 +10,7 @@ import {
   HeartPulse,
 } from "lucide-react";
 import type { EncounterWithCombatants, ClientToServerEvents } from "@/types/socket";
+import { getTypeColor, getTypeLabel } from "@/lib/combatantTypes";
 import { HpTracker } from "./HpTracker";
 
 type EmitFn = <E extends keyof ClientToServerEvents>(
@@ -25,6 +26,8 @@ export function InitiativeList({
   readOnly,
   playerCombatantId,
   physicalDice,
+  showMonsterHpBar,
+  hideCurrentTurn,
 }: {
   encounter: EncounterWithCombatants;
   isDM: boolean;
@@ -33,6 +36,8 @@ export function InitiativeList({
   readOnly?: boolean;
   playerCombatantId?: string | null;
   physicalDice?: boolean;
+  showMonsterHpBar?: boolean;
+  hideCurrentTurn?: boolean;
 }) {
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
@@ -49,12 +54,17 @@ export function InitiativeList({
   // Rotate so current turn is at top (both DM and player views)
   const isActive = encounter.status === "ACTIVE";
   const shouldRotate = isActive && activeEntries.length > 0 && encounter.currentTurnIdx > 0;
-  const displayEntries = shouldRotate
+  const rotatedEntries = shouldRotate
     ? [
         ...activeEntries.slice(encounter.currentTurnIdx),
         ...activeEntries.slice(0, encounter.currentTurnIdx),
       ]
     : activeEntries;
+
+  // When hideCurrentTurn is set, skip the current entry (shown in banner instead)
+  const displayEntries = hideCurrentTurn && isActive
+    ? rotatedEntries.filter((_, idx) => !(shouldRotate ? idx === 0 : idx === encounter.currentTurnIdx))
+    : rotatedEntries;
 
   return (
     <div className="space-y-3">
@@ -89,6 +99,11 @@ export function InitiativeList({
             // Drag-reorder needs original sorted index for server
             const dragIdx = originalIdx;
 
+            // Resolve owner name for companions
+            const ownerName = entry.combatant.type === "COMPANION" && entry.combatant.ownerId
+              ? encounter.combatants.find((ec) => ec.combatantId === entry.combatant.ownerId)?.displayName ?? null
+              : null;
+
             return (
               <InitiativeCard
                 key={entry.id}
@@ -102,6 +117,8 @@ export function InitiativeList({
                 readOnly={readOnly}
                 playerCombatantId={playerCombatantId}
                 physicalDice={physicalDice}
+                showMonsterHpBar={showMonsterHpBar}
+                ownerName={ownerName}
                 draggable={canDrag}
                 isDragOver={dragOverIdx === dragIdx}
                 positionLabel={positionLabel}
@@ -190,6 +207,8 @@ function InitiativeCard({
   positionLabel,
   playerCombatantId,
   physicalDice,
+  showMonsterHpBar,
+  ownerName,
   onDragStart,
   onDragOver,
   onDragEnd,
@@ -208,6 +227,8 @@ function InitiativeCard({
   positionLabel?: string | null;
   playerCombatantId?: string | null;
   physicalDice?: boolean;
+  showMonsterHpBar?: boolean;
+  ownerName?: string | null;
   onDragStart?: () => void;
   onDragOver?: (e: React.DragEvent) => void;
   onDragEnd?: () => void;
@@ -215,15 +236,13 @@ function InitiativeCard({
 }) {
   const [manualInit, setManualInit] = useState("");
 
-  const typeColor =
-    entry.combatant.type === "MONSTER"
-      ? "text-accent-red"
-      : entry.combatant.type === "PLAYER_CHARACTER"
-      ? "text-accent-green"
-      : "text-accent-blue";
+  const typeColor = getTypeColor(entry.combatant.type);
 
-  const showExactHp = isDM || entry.combatant.type !== "MONSTER";
-  const showHpControls = !readOnly && (isDM || entry.combatant.type === "PLAYER_CHARACTER");
+  const showExactHp = isDM || (entry.combatant.type !== "MONSTER");
+  const isOwnCombatant = !!playerCombatantId && entry.combatantId === playerCombatantId;
+  const isOwnCompanion = !!playerCombatantId && entry.combatant.ownerId === playerCombatantId;
+  const showHpControls = !readOnly && (isDM || isOwnCombatant || isOwnCompanion);
+  const hideHpBar = !isDM && entry.combatant.type === "MONSTER" && showMonsterHpBar === false;
 
   function handleManualRoll() {
     const val = parseInt(manualInit);
@@ -288,11 +307,7 @@ function InitiativeCard({
           <div>
             <div className="flex items-center gap-1.5">
               <span className={`text-[10px] ${typeColor}`}>
-                {entry.combatant.type === "MONSTER"
-                  ? "MON"
-                  : entry.combatant.type === "PLAYER_CHARACTER"
-                  ? "PC"
-                  : "NPC"}
+                {getTypeLabel(entry.combatant.type)}
               </span>
               <span
                 className={`text-sm font-medium ${
@@ -301,6 +316,11 @@ function InitiativeCard({
               >
                 {entry.displayName}
               </span>
+              {ownerName && (
+                <span className="text-[10px] text-text-muted">
+                  ({ownerName})
+                </span>
+              )}
               {entry.isHidden && isDM && (
                 <span className="text-[10px] bg-accent-purple/20 text-accent-purple px-1.5 py-0.5 rounded">
                   Hidden
@@ -321,7 +341,7 @@ function InitiativeCard({
         </div>
 
         <div className="flex items-center gap-2">
-          {!readOnly && isRolling && entry.initiative === null && (isDM || entry.combatantId === playerCombatantId) && (
+          {!readOnly && isRolling && entry.initiative === null && (isDM || entry.combatantId === playerCombatantId || (playerCombatantId && entry.combatant.ownerId === playerCombatantId)) && (
             <>
               {(isDM || physicalDice) && (
                 <div className="flex items-center gap-1">
@@ -392,6 +412,7 @@ function InitiativeCard({
           onHpChange={handleHpChange}
           showControls={showHpControls}
           showExact={showExactHp}
+          hideBar={hideHpBar}
         />
       </div>
     </div>

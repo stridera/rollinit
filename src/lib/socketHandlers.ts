@@ -52,6 +52,7 @@ async function getSessionState(joinCode: string): Promise<SessionState | null> {
     isLocked: session.isLocked,
     hasPassword: session.password != null,
     physicalDice: session.physicalDice,
+    showMonsterHpBar: session.showMonsterHpBar,
     combatants: session.combatants,
     encounters: session.encounters,
     activeEncounterId: activeEncounter?.id ?? null,
@@ -81,9 +82,9 @@ async function reassignSortOrder(encounterId: string) {
     const initA = a.initiative ?? -Infinity;
     const initB = b.initiative ?? -Infinity;
     if (initB !== initA) return initB - initA;
-    // PCs win ties
-    const aIsPC = a.combatant.type === "PLAYER_CHARACTER" ? 0 : 1;
-    const bIsPC = b.combatant.type === "PLAYER_CHARACTER" ? 0 : 1;
+    // PCs/Companions win ties
+    const aIsPC = a.combatant.type === "PLAYER_CHARACTER" || a.combatant.type === "COMPANION" ? 0 : 1;
+    const bIsPC = b.combatant.type === "PLAYER_CHARACTER" || b.combatant.type === "COMPANION" ? 0 : 1;
     if (aIsPC !== bIsPC) return aIsPC - bIsPC;
     return b.initiativeBonus - a.initiativeBonus;
   });
@@ -164,6 +165,16 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
     });
     if (!session) return;
 
+    // For companions, look up owner to inherit playerSocketId
+    let playerSocketId: string | null = null;
+    if (data.type === "COMPANION" && data.ownerId) {
+      const owner = await prisma.combatant.findUnique({
+        where: { id: data.ownerId },
+        select: { playerSocketId: true },
+      });
+      playerSocketId = owner?.playerSocketId ?? null;
+    }
+
     const combatant = await prisma.combatant.create({
       data: {
         name: capitalizeFirst(data.name),
@@ -174,6 +185,7 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
         armorClass: data.armorClass,
         isHidden: data.isHidden,
         sessionId: session.id,
+        ...(data.type === "COMPANION" && data.ownerId ? { ownerId: data.ownerId, playerSocketId } : {}),
       },
       include: { encounterCombatants: true },
     });
@@ -323,15 +335,26 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
     });
     if (!session) return;
 
-    // Get all PCs/NPCs that auto-join and aren't excluded
-    const autoJoinCombatants = await prisma.combatant.findMany({
+    // Get all PCs/NPCs/Companions that auto-join and aren't excluded
+    const allAutoJoin = await prisma.combatant.findMany({
       where: {
         sessionId: session.id,
-        type: { in: ["PLAYER_CHARACTER", "NPC"] },
+        type: { in: ["PLAYER_CHARACTER", "NPC", "COMPANION"] },
         autoJoin: true,
-        id: { notIn: data.excludePcIds },
       },
     });
+
+    const autoJoinCombatants = allAutoJoin.filter(
+      (c) => (c.type === "PLAYER_CHARACTER" || c.type === "NPC") && !data.excludePcIds.includes(c.id)
+    );
+
+    // Companions of auto-joining PCs
+    const autoJoinPcIds = new Set(
+      autoJoinCombatants.filter((c) => c.type === "PLAYER_CHARACTER").map((c) => c.id)
+    );
+    const companions = allAutoJoin.filter(
+      (c) => c.type === "COMPANION" && c.ownerId && autoJoinPcIds.has(c.ownerId)
+    );
 
     // Build encounter combatant create data
     const instanceData: Array<{
@@ -350,6 +373,21 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
 
     // Add PCs/NPCs — one instance each, copying current HP
     for (const c of autoJoinCombatants) {
+      instanceData.push({
+        displayName: c.name,
+        currentHp: c.currentHp,
+        maxHp: c.maxHp,
+        armorClass: c.armorClass,
+        initiativeBonus: c.initiativeBonus,
+        conditions: [...c.conditions],
+        isHidden: c.isHidden,
+        combatantId: c.id,
+        sortOrder: sortOrder++,
+      });
+    }
+
+    // Add companions
+    for (const c of companions) {
       instanceData.push({
         displayName: c.name,
         currentHp: c.currentHp,
@@ -452,10 +490,10 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
       });
     }
 
-    // PC HP sync-back: update session-level combatant HP
+    // PC/Companion HP sync-back: update session-level combatant HP
     if (
       data.updates.currentHp !== undefined &&
-      instance.combatant.type === "PLAYER_CHARACTER"
+      (instance.combatant.type === "PLAYER_CHARACTER" || instance.combatant.type === "COMPANION")
     ) {
       const updated = await prisma.combatant.update({
         where: { id: instance.combatantId },
@@ -508,7 +546,8 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
 
     if (!instance) return;
 
-    // Authorization: non-DM sockets can only roll for their own combatant
+    // Authorization: non-DM sockets can only roll for their own combatant or companion
+    // (companions have playerSocketId synced to the owner's socket)
     const isDM = socket.rooms.has(`dm:${data.joinCode}`);
     if (!isDM) {
       if (instance.combatant.playerSocketId !== socket.id) {
@@ -821,9 +860,9 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
     });
     if (!template) return;
 
-    const isPC = template.type === "PLAYER_CHARACTER" || template.type === "NPC";
+    const isPC = template.type === "PLAYER_CHARACTER" || template.type === "NPC" || template.type === "COMPANION";
 
-    // PCs/NPCs can only be in an encounter once; monsters can be added multiple times
+    // PCs/NPCs/Companions can only be in an encounter once; monsters can be added multiple times
     if (isPC && encounter.combatants.some((ec) => ec.combatantId === data.combatantId)) return;
 
     const maxSortOrder = encounter.combatants.reduce(
@@ -966,6 +1005,7 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
     socket.emit("session:dmSettings", {
       password: session.password,
       physicalDice: session.physicalDice,
+      showMonsterHpBar: session.showMonsterHpBar,
     });
   });
 
@@ -978,12 +1018,15 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
       return;
     }
 
-    const updateData: { password?: string | null; physicalDice?: boolean } = {};
+    const updateData: { password?: string | null; physicalDice?: boolean; showMonsterHpBar?: boolean } = {};
     if (data.settings.password !== undefined) {
       updateData.password = data.settings.password || null;
     }
     if (data.settings.physicalDice !== undefined) {
       updateData.physicalDice = data.settings.physicalDice;
+    }
+    if (data.settings.showMonsterHpBar !== undefined) {
+      updateData.showMonsterHpBar = data.settings.showMonsterHpBar;
     }
 
     const updated = await prisma.session.update({
@@ -994,6 +1037,7 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
     const settingsData = {
       hasPassword: updated.password != null,
       physicalDice: updated.physicalDice,
+      showMonsterHpBar: updated.showMonsterHpBar,
     };
     io.to(`session:${data.joinCode}`).emit("session:settingsChanged", settingsData);
     io.to(`dm:${data.joinCode}`).emit("session:settingsChanged", settingsData);
@@ -1123,12 +1167,72 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
       socket.to(`session:${data.joinCode}`).emit("combatant:updated", updated);
     }
 
+    // Update companion socketIds too
+    const companionsList = await prisma.combatant.findMany({
+      where: { ownerId: combatant.id, type: "COMPANION" },
+    });
+    for (const companion of companionsList) {
+      const updatedCompanion = await prisma.combatant.update({
+        where: { id: companion.id },
+        data: { playerSocketId: socket.id },
+        include: { encounterCombatants: true },
+      });
+      io.to(`dm:${data.joinCode}`).emit("combatant:updated", updatedCompanion);
+      if (!updatedCompanion.isHidden) {
+        socket.to(`session:${data.joinCode}`).emit("combatant:updated", updatedCompanion);
+      }
+    }
+
     socket.emit("player:registered", {
       combatantId: updated.id,
       name: updated.name,
     });
 
     broadcastViewerCount(io, data.joinCode);
+  });
+
+  // --- Companion Management ---
+  socket.on("player:addCompanion", async (data) => {
+    const session = await prisma.session.findUnique({
+      where: { joinCode: data.joinCode },
+    });
+    if (!session) {
+      socket.emit("error", "Session not found");
+      return;
+    }
+
+    // Verify the owner exists and belongs to this player
+    const owner = await prisma.combatant.findFirst({
+      where: {
+        id: data.ownerCombatantId,
+        sessionId: session.id,
+        type: "PLAYER_CHARACTER",
+        playerSocketId: socket.id,
+      },
+    });
+    if (!owner) {
+      socket.emit("error", "You can only add companions to your own character");
+      return;
+    }
+
+    const companion = await prisma.combatant.create({
+      data: {
+        name: capitalizeFirst(data.name),
+        type: "COMPANION",
+        initiativeBonus: data.initiativeBonus,
+        maxHp: data.maxHp,
+        currentHp: data.maxHp,
+        armorClass: data.armorClass,
+        autoJoin: true,
+        playerSocketId: socket.id,
+        ownerId: owner.id,
+        sessionId: session.id,
+      },
+      include: { encounterCombatants: true },
+    });
+
+    io.to(`dm:${data.joinCode}`).emit("combatant:added", companion);
+    socket.to(`session:${data.joinCode}`).emit("combatant:added", companion);
   });
 
   // --- Disconnect cleanup ---

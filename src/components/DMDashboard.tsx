@@ -13,6 +13,9 @@ import {
   Github,
   Eye,
   Settings,
+  Maximize2,
+  Minimize2,
+  MonitorSmartphone,
 } from "lucide-react";
 import type { CombatantWithInstances, EncounterWithCombatants } from "@/types/socket";
 import { ConnectionStatus } from "./ConnectionStatus";
@@ -24,6 +27,8 @@ import { InitiativeList } from "./InitiativeList";
 import { DiceRoller } from "./DiceRoller";
 import { DiceLog } from "./DiceLog";
 import { DMSettingsModal } from "./DMSettingsModal";
+import { useFullscreen } from "@/hooks/useFullscreen";
+import { useWakeLock } from "@/hooks/useWakeLock";
 
 type MobileTab = "combatants" | "combat" | "dice";
 
@@ -42,6 +47,8 @@ export function DMDashboard({
   const [mobileTab, setMobileTab] = useState<MobileTab>("combat");
   const [viewerCount, setViewerCount] = useState<{ spectators: number; players: number } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const fullscreen = useFullscreen();
+  const wakeLock = useWakeLock();
 
   function handleCopyCode() {
     if (navigator.clipboard?.writeText) {
@@ -148,10 +155,10 @@ export function DMDashboard({
       setViewerCount(data);
     }
 
-    function onSettingsChanged(data: { hasPassword: boolean; physicalDice: boolean }) {
+    function onSettingsChanged(data: { hasPassword: boolean; physicalDice: boolean; showMonsterHpBar: boolean }) {
       setSessionState((prev) => {
         if (!prev) return prev;
-        return { ...prev, hasPassword: data.hasPassword, physicalDice: data.physicalDice };
+        return { ...prev, hasPassword: data.hasPassword, physicalDice: data.physicalDice, showMonsterHpBar: data.showMonsterHpBar };
       });
     }
 
@@ -262,6 +269,26 @@ export function DMDashboard({
             >
               <Settings size={16} />
             </button>
+            {wakeLock.isSupported && (
+              <button
+                onClick={wakeLock.toggle}
+                className={`p-1.5 rounded transition-colors ${
+                  wakeLock.isActive ? "text-accent-gold" : "text-text-muted hover:text-text-secondary"
+                }`}
+                title={wakeLock.isActive ? "Disable wake lock" : "Keep screen on"}
+              >
+                <MonitorSmartphone size={16} />
+              </button>
+            )}
+            {fullscreen.isSupported && (
+              <button
+                onClick={fullscreen.toggle}
+                className="p-1.5 rounded text-text-muted hover:text-text-secondary transition-colors"
+                title={fullscreen.isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+              >
+                {fullscreen.isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+              </button>
+            )}
             <a
               href="https://github.com/stridera/rollinit/issues"
               target="_blank"
@@ -288,7 +315,7 @@ export function DMDashboard({
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left column: Combatants + Add Form */}
           <div className={`space-y-6 ${mobileTab !== "combatants" ? "hidden lg:block" : ""}`}>
-            <AddCombatantForm joinCode={joinCode} emit={emit} />
+            <AddCombatantForm joinCode={joinCode} emit={emit} combatants={sessionState?.combatants ?? []} />
             <CombatantList
               combatants={sessionState?.combatants ?? []}
               joinCode={joinCode}

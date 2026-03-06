@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Pencil, Check, Trash2, Swords, CheckCircle, Eye } from "lucide-react";
 import type { CombatantWithInstances, ClientToServerEvents } from "@/types/socket";
 import type { EncounterStatus } from "@prisma/client";
+import { getTypeColor, getTypeLabel } from "@/lib/combatantTypes";
 import { HpTracker } from "./HpTracker";
 
 type EmitFn = <E extends keyof ClientToServerEvents>(
@@ -45,6 +46,16 @@ export function CombatantList({
   const monsters = combatants.filter((c) => c.type === "MONSTER");
   const pcs = combatants.filter((c) => c.type === "PLAYER_CHARACTER");
   const npcs = combatants.filter((c) => c.type === "NPC");
+  const companions = combatants.filter((c) => c.type === "COMPANION");
+
+  // Build owner name lookup for companions
+  const ownerNames = new Map<string, string>();
+  for (const c of combatants) {
+    if (c.type === "COMPANION" && c.ownerId) {
+      const owner = combatants.find((o) => o.id === c.ownerId);
+      if (owner) ownerNames.set(c.id, owner.name);
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -93,6 +104,22 @@ export function CombatantList({
         />
       )}
 
+      {companions.length > 0 && (
+        <CombatantGroup
+          label="Companions"
+          combatants={companions}
+          joinCode={joinCode}
+          emit={emit}
+          isDM={isDM}
+          editingId={editingId}
+          setEditingId={setEditingId}
+          activeEncounterId={activeEncounterId}
+          activeEncounterStatus={activeEncounterStatus}
+          activeEncounterCombatantIds={activeEncounterCombatantIds}
+          ownerNames={ownerNames}
+        />
+      )}
+
       {npcs.length > 0 && (
         <CombatantGroup
           label="NPCs"
@@ -122,6 +149,7 @@ function CombatantGroup({
   activeEncounterId,
   activeEncounterStatus,
   activeEncounterCombatantIds,
+  ownerNames,
 }: {
   label: string;
   combatants: CombatantWithInstances[];
@@ -133,6 +161,7 @@ function CombatantGroup({
   activeEncounterId?: string | null;
   activeEncounterStatus?: EncounterStatus | null;
   activeEncounterCombatantIds?: Set<string>;
+  ownerNames?: Map<string, string>;
 }) {
   return (
     <div className="space-y-2">
@@ -153,6 +182,7 @@ function CombatantGroup({
           activeEncounterId={activeEncounterId}
           activeEncounterStatus={activeEncounterStatus}
           activeEncounterCombatantIds={activeEncounterCombatantIds}
+          ownerName={ownerNames?.get(c.id)}
         />
       ))}
     </div>
@@ -169,6 +199,7 @@ function CombatantCard({
   activeEncounterId,
   activeEncounterStatus,
   activeEncounterCombatantIds,
+  ownerName,
 }: {
   combatant: CombatantWithInstances;
   joinCode: string;
@@ -179,9 +210,11 @@ function CombatantCard({
   activeEncounterId?: string | null;
   activeEncounterStatus?: EncounterStatus | null;
   activeEncounterCombatantIds?: Set<string>;
+  ownerName?: string;
 }) {
   const isMonster = combatant.type === "MONSTER";
   const isPC = combatant.type === "PLAYER_CHARACTER";
+  const isCompanion = combatant.type === "COMPANION";
 
   const canAddToCombat =
     isDM &&
@@ -189,11 +222,7 @@ function CombatantCard({
     (activeEncounterStatus === "ACTIVE" || activeEncounterStatus === "ROLLING");
   const isInCombat = activeEncounterCombatantIds?.has(combatant.id) ?? false;
 
-  const typeColor = isMonster
-    ? "text-accent-red"
-    : isPC
-    ? "text-accent-green"
-    : "text-accent-blue";
+  const typeColor = getTypeColor(combatant.type);
 
   function handleHpChange(newHp: number) {
     emit("combatant:update", {
@@ -208,9 +237,12 @@ function CombatantCard({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className={`text-xs ${typeColor}`}>
-            {isMonster ? "MON" : isPC ? "PC" : "NPC"}
+            {getTypeLabel(combatant.type)}
           </span>
           <span className="font-medium text-sm">{combatant.name}</span>
+          {ownerName && (
+            <span className="text-[10px] text-text-muted">({ownerName})</span>
+          )}
           {isPC && (
             <span
               className={`inline-block w-2 h-2 rounded-full ${
@@ -257,14 +289,14 @@ function CombatantCard({
         </div>
       </div>
 
-      {/* HP Tracker — only for PCs/NPCs (monsters are templates, HP tracked per-instance) */}
+      {/* HP Tracker — only for PCs/NPCs/Companions (monsters are templates, HP tracked per-instance) */}
       {!isMonster && (
         <HpTracker
           currentHp={combatant.currentHp}
           maxHp={combatant.maxHp}
           onHpChange={handleHpChange}
-          showControls={isDM || isPC}
-          showExact={isDM || isPC}
+          showControls={isDM || isPC || isCompanion}
+          showExact={isDM || isPC || isCompanion}
         />
       )}
 

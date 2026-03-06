@@ -29,6 +29,7 @@ export function DMSettingsModal({
 }) {
   const [password, setPassword] = useState("");
   const [physicalDice, setPhysicalDice] = useState(false);
+  const [showMonsterHpBar, setShowMonsterHpBar] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -38,9 +39,10 @@ export function DMSettingsModal({
 
     setLoaded(false);
 
-    function onDmSettings(data: { password: string | null; physicalDice: boolean }) {
+    function onDmSettings(data: { password: string | null; physicalDice: boolean; showMonsterHpBar: boolean }) {
       setPassword(data.password ?? "");
       setPhysicalDice(data.physicalDice);
+      setShowMonsterHpBar(data.showMonsterHpBar);
       setLoaded(true);
     }
 
@@ -60,6 +62,7 @@ export function DMSettingsModal({
       settings: {
         password: password || null,
         physicalDice,
+        showMonsterHpBar,
       },
     });
     setTimeout(() => {
@@ -136,6 +139,31 @@ export function DMSettingsModal({
               </div>
               <p className="text-text-muted text-xs">
                 When enabled, players can manually enter their d20 roll result for initiative instead of only using the auto-roller.
+              </p>
+            </div>
+
+            {/* Monster HP Bar */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-sm text-text-secondary">
+                  Show Monster HP Bar
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowMonsterHpBar(!showMonsterHpBar)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    showMonsterHpBar ? "bg-accent-gold" : "bg-bg-tertiary"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
+                      showMonsterHpBar ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
+              <p className="text-text-muted text-xs">
+                When disabled, players see a full-width HP bar for monsters that only changes color, hiding the exact percentage.
               </p>
             </div>
 

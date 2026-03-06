@@ -10,9 +10,10 @@ model Session {
   id        String   @id @default(cuid())
   joinCode  String   @unique @db.VarChar(6)
   dmToken   String   @unique
-  isLocked     Boolean  @default(false)
-  password     String?
-  physicalDice Boolean  @default(false)
+  isLocked         Boolean  @default(false)
+  password         String?
+  physicalDice     Boolean  @default(false)
+  showMonsterHpBar Boolean  @default(true)
   createdAt    DateTime @default(now())
 
   encounters Encounter[]
@@ -45,6 +46,7 @@ enum CombatantType {
   PLAYER_CHARACTER
   MONSTER
   NPC
+  COMPANION
 }
 
 model Combatant {
@@ -60,6 +62,10 @@ model Combatant {
   autoJoin        Boolean       @default(true)
   playerSocketId  String?
   createdAt       DateTime      @default(now())
+
+  ownerId    String?
+  owner      Combatant?  @relation("CompanionOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  companions Combatant[] @relation("CompanionOwner")
 
   sessionId String
   session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)

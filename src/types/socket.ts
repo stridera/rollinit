@@ -4,7 +4,6 @@ import type {
   DiceRoll,
   Encounter,
   EncounterCombatant,
-  EncounterStatus,
 } from "@prisma/client";
 
 // Composite types for client consumption
@@ -23,6 +22,7 @@ export type SessionState = {
   isLocked: boolean;
   hasPassword: boolean;
   physicalDice: boolean;
+  showMonsterHpBar: boolean;
   combatants: CombatantWithInstances[];
   encounters: EncounterWithCombatants[];
   activeEncounterId: string | null;
@@ -38,6 +38,7 @@ export type AddCombatantPayload = {
   maxHp: number;
   armorClass: number;
   isHidden: boolean;
+  ownerId?: string;
 };
 
 export type UpdateCombatantPayload = {
@@ -166,7 +167,16 @@ export type PlayerReconnectPayload = { joinCode: string; combatantId: string };
 export type UpdateSettingsPayload = {
   joinCode: string;
   dmToken: string;
-  settings: { password?: string | null; physicalDice?: boolean };
+  settings: { password?: string | null; physicalDice?: boolean; showMonsterHpBar?: boolean };
+};
+
+export type AddCompanionPayload = {
+  joinCode: string;
+  ownerCombatantId: string;
+  name: string;
+  maxHp: number;
+  initiativeBonus: number;
+  armorClass: number;
 };
 export type ValidatePasswordPayload = { joinCode: string; password: string };
 
@@ -189,9 +199,9 @@ export interface ServerToClientEvents {
   "player:registered": (data: { combatantId: string; name: string }) => void;
   "player:removed": () => void;
   "session:viewerCount": (data: { spectators: number; players: number }) => void;
-  "session:settingsChanged": (data: { hasPassword: boolean; physicalDice: boolean }) => void;
+  "session:settingsChanged": (data: { hasPassword: boolean; physicalDice: boolean; showMonsterHpBar: boolean }) => void;
   "session:passwordValid": () => void;
-  "session:dmSettings": (data: { password: string | null; physicalDice: boolean }) => void;
+  "session:dmSettings": (data: { password: string | null; physicalDice: boolean; showMonsterHpBar: boolean }) => void;
   error: (message: string) => void;
 }
 
@@ -223,4 +233,5 @@ export interface ClientToServerEvents {
   "session:updateSettings": (data: UpdateSettingsPayload) => void;
   "session:validatePassword": (data: ValidatePasswordPayload) => void;
   "session:getSettings": (data: { joinCode: string; dmToken: string }) => void;
+  "player:addCompanion": (data: AddCompanionPayload) => void;
 }

@@ -2,11 +2,19 @@
 
 import { Swords, RotateCw, Zap } from "lucide-react";
 import type { EncounterWithCombatants } from "@/types/socket";
+import { getTypeColor, getTypeLabel } from "@/lib/combatantTypes";
+import { HpTracker } from "./HpTracker";
 
 export function CurrentTurnBanner({
   encounter,
+  showMonsterHpBar,
+  showHpControls,
+  onHpChange,
 }: {
   encounter: EncounterWithCombatants;
+  showMonsterHpBar?: boolean;
+  showHpControls?: boolean;
+  onHpChange?: (instanceId: string, newHp: number) => void;
 }) {
   const activeEntries = encounter.combatants.filter(
     (ec) => ec.isActive
@@ -14,6 +22,12 @@ export function CurrentTurnBanner({
   const currentEntry = activeEntries[encounter.currentTurnIdx];
 
   if (!currentEntry) return null;
+
+  const isMonster = currentEntry.combatant.type === "MONSTER";
+  const showExact = !isMonster;
+  const hideBar = isMonster && showMonsterHpBar === false;
+
+  const typeColor = getTypeColor(currentEntry.combatant.type);
 
   return (
     <div className="card current-turn text-center py-6">
@@ -25,6 +39,9 @@ export function CurrentTurnBanner({
         {currentEntry.displayName}
       </h2>
       <div className="flex items-center justify-center gap-3 text-text-secondary text-sm mt-2">
+        <span className={`text-xs font-medium ${typeColor}`}>
+          {getTypeLabel(currentEntry.combatant.type)}
+        </span>
         <span className="flex items-center gap-1">
           <RotateCw size={12} />
           Round {encounter.roundNumber}
@@ -33,6 +50,16 @@ export function CurrentTurnBanner({
           <Zap size={12} />
           Initiative {currentEntry.initiative ?? "?"}
         </span>
+      </div>
+      <div className="mt-3 max-w-xs mx-auto">
+        <HpTracker
+          currentHp={currentEntry.currentHp}
+          maxHp={currentEntry.maxHp}
+          onHpChange={(newHp) => onHpChange?.(currentEntry.id, newHp)}
+          showControls={!!showHpControls}
+          showExact={showExact}
+          hideBar={hideBar}
+        />
       </div>
     </div>
   );
