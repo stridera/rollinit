@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Pencil, Check, Trash2, Swords, CheckCircle, Eye } from "lucide-react";
+import { NumericInput } from "./NumericInput";
 import type { CombatantWithInstances, ClientToServerEvents } from "@/types/socket";
 import type { EncounterStatus } from "@prisma/client";
 import { getTypeColor, getTypeLabel } from "@/lib/combatantTypes";
@@ -410,29 +411,27 @@ function CombatantEditor({
       <div className="grid grid-cols-3 gap-2">
         <div>
           <label className="text-[10px] text-text-muted">Init</label>
-          <input
-            type="number"
+          <NumericInput
             value={initBonus}
-            onChange={(e) => setInitBonus(Number(e.target.value))}
+            onChange={setInitBonus}
             className="w-full text-sm text-center"
           />
         </div>
         <div>
           <label className="text-[10px] text-text-muted">Max HP</label>
-          <input
-            type="number"
+          <NumericInput
             value={maxHp}
-            onChange={(e) => setMaxHp(Number(e.target.value))}
+            onChange={setMaxHp}
+            defaultValue={1}
             className="w-full text-sm text-center"
             min={1}
           />
         </div>
         <div>
           <label className="text-[10px] text-text-muted">AC</label>
-          <input
-            type="number"
+          <NumericInput
             value={ac}
-            onChange={(e) => setAc(Number(e.target.value))}
+            onChange={setAc}
             className="w-full text-sm text-center"
           />
         </div>

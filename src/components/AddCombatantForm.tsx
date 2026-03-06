@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Ghost, User, Plus, PawPrint } from "lucide-react";
+import { NumericInput } from "./NumericInput";
 import type { CombatantType } from "@prisma/client";
 import type { ClientToServerEvents, CombatantWithInstances } from "@/types/socket";
 import { SRD_MONSTERS, type SrdMonster } from "@/data/srd-monsters";
@@ -220,29 +221,28 @@ export function AddCombatantForm({
             <label className="text-xs text-text-muted block mb-1">
               Init Bonus
             </label>
-            <input
-              type="number"
+            <NumericInput
               value={initiativeBonus}
-              onChange={(e) => setInitiativeBonus(Number(e.target.value))}
+              onChange={setInitiativeBonus}
               className="w-full text-center"
             />
           </div>
           <div>
             <label className="text-xs text-text-muted block mb-1">HP</label>
-            <input
-              type="number"
+            <NumericInput
               value={maxHp}
-              onChange={(e) => setMaxHp(Number(e.target.value))}
+              onChange={setMaxHp}
+              defaultValue={10}
               min={1}
               className="w-full text-center"
             />
           </div>
           <div>
             <label className="text-xs text-text-muted block mb-1">AC</label>
-            <input
-              type="number"
+            <NumericInput
               value={armorClass}
-              onChange={(e) => setArmorClass(Number(e.target.value))}
+              onChange={setArmorClass}
+              defaultValue={10}
               className="w-full text-center"
             />
           </div>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Eye, LogIn, Github, Users, Maximize2, Minimize2, MonitorSmartphone, ChevronDown, ChevronUp } from "lucide-react";
+import { NumericInput } from "./NumericInput";
 import { useSocket } from "@/lib/useSocket";
 import type { CombatantWithInstances, EncounterWithCombatants } from "@/types/socket";
 import { ConnectionStatus } from "./ConnectionStatus";
@@ -345,29 +346,27 @@ export function PlayerView({ joinCode }: { joinCode: string }) {
             <div className="grid grid-cols-3 gap-2">
               <div>
                 <label className="text-[10px] text-text-muted">Max HP</label>
-                <input
-                  type="number"
+                <NumericInput
                   value={maxHpInput}
-                  onChange={(e) => setMaxHpInput(Number(e.target.value))}
+                  onChange={setMaxHpInput}
+                  defaultValue={1}
                   className="w-full text-sm text-center"
                   min={1}
                 />
               </div>
               <div>
                 <label className="text-[10px] text-text-muted">Init Bonus</label>
-                <input
-                  type="number"
+                <NumericInput
                   value={initBonusInput}
-                  onChange={(e) => setInitBonusInput(Number(e.target.value))}
+                  onChange={setInitBonusInput}
                   className="w-full text-sm text-center"
                 />
               </div>
               <div>
                 <label className="text-[10px] text-text-muted">AC</label>
-                <input
-                  type="number"
+                <NumericInput
                   value={acInput}
-                  onChange={(e) => setAcInput(Number(e.target.value))}
+                  onChange={setAcInput}
                   className="w-full text-sm text-center"
                 />
               </div>
@@ -574,29 +573,28 @@ export function PlayerView({ joinCode }: { joinCode: string }) {
                 <div className="grid grid-cols-3 gap-2">
                   <div>
                     <label className="text-[10px] text-text-muted">Max HP</label>
-                    <input
-                      type="number"
+                    <NumericInput
                       value={companionHp}
-                      onChange={(e) => setCompanionHp(Number(e.target.value))}
+                      onChange={setCompanionHp}
+                      defaultValue={10}
                       className="w-full text-sm text-center"
                       min={1}
                     />
                   </div>
                   <div>
                     <label className="text-[10px] text-text-muted">Init Bonus</label>
-                    <input
-                      type="number"
+                    <NumericInput
                       value={companionInit}
-                      onChange={(e) => setCompanionInit(Number(e.target.value))}
+                      onChange={setCompanionInit}
                       className="w-full text-sm text-center"
                     />
                   </div>
                   <div>
                     <label className="text-[10px] text-text-muted">AC</label>
-                    <input
-                      type="number"
+                    <NumericInput
                       value={companionAc}
-                      onChange={(e) => setCompanionAc(Number(e.target.value))}
+                      onChange={setCompanionAc}
+                      defaultValue={10}
                       className="w-full text-sm text-center"
                     />
                   </div>
