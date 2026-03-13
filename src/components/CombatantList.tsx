@@ -71,10 +71,13 @@ export function CombatantList({
           </span>
         </h3>
         <div className="flex items-center gap-2">
-          {isDM && healable.length > 0 && (
+          {isDM && pcs.length + npcs.length + companions.length > 0 && (
             <button
               onClick={() => emit("session:longRest", { joinCode })}
-              className="btn btn-ghost btn-sm text-xs flex items-center gap-1"
+              disabled={healable.length === 0}
+              className={`btn btn-ghost btn-sm text-xs flex items-center gap-1 ${
+                healable.length === 0 ? "opacity-40 cursor-default" : ""
+              }`}
               title="Heal all PCs, NPCs, and companions to full HP"
             >
               <Moon size={14} />
