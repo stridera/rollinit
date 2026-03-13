@@ -1292,6 +1292,42 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
     socket.to(`session:${data.joinCode}`).emit("combatant:added", companion);
   });
 
+  // --- Long Rest ---
+  socket.on("session:longRest", async (data) => {
+    try {
+      // Heal all PCs, NPCs, and Companions to full HP
+      const healed = await prisma.combatant.findMany({
+        where: {
+          session: { joinCode: data.joinCode },
+          type: { in: ["PLAYER_CHARACTER", "NPC", "COMPANION"] },
+        },
+      });
+
+      await prisma.$transaction(
+        healed
+          .filter((c) => c.currentHp < c.maxHp)
+          .map((c) =>
+            prisma.combatant.update({
+              where: { id: c.id },
+              data: { currentHp: c.maxHp },
+            })
+          )
+      );
+
+      // Broadcast updated state to all clients
+      const state = await getSessionState(data.joinCode);
+      if (state) {
+        io.to(`dm:${data.joinCode}`).emit("session:state", state);
+        io.to(`session:${data.joinCode}`)
+          .except(`dm:${data.joinCode}`)
+          .emit("session:state", filterStateForPlayers(state));
+      }
+    } catch (err) {
+      console.error("[session:longRest] Failed:", err);
+      socket.emit("error", "Failed to perform long rest");
+    }
+  });
+
   // --- Disconnect cleanup ---
   socket.on("disconnect", async () => {
     // Broadcast DM status for any sessions where this was the DM

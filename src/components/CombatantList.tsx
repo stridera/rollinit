@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, Check, Trash2, Swords, CheckCircle, Eye } from "lucide-react";
+import { Pencil, Check, Trash2, Swords, CheckCircle, Eye, Moon } from "lucide-react";
 import { NumericInput } from "./NumericInput";
 import type { CombatantWithInstances, ClientToServerEvents } from "@/types/socket";
 import type { EncounterStatus } from "@prisma/client";
@@ -44,6 +44,9 @@ export function CombatantList({
     );
   }
 
+  const healable = combatants.filter(
+    (c) => c.type !== "MONSTER" && c.currentHp < c.maxHp
+  );
   const monsters = combatants.filter((c) => c.type === "MONSTER");
   const pcs = combatants.filter((c) => c.type === "PLAYER_CHARACTER");
   const npcs = combatants.filter((c) => c.type === "NPC");
@@ -67,12 +70,24 @@ export function CombatantList({
             ({combatants.length})
           </span>
         </h3>
-        {viewerCount && viewerCount.spectators > 0 && (
-          <span className="flex items-center gap-1 text-text-muted text-xs" title={`${viewerCount.players} player${viewerCount.players !== 1 ? "s" : ""}, ${viewerCount.spectators} spectator${viewerCount.spectators !== 1 ? "s" : ""}`}>
-            <Eye size={12} />
-            {viewerCount.spectators} spectator{viewerCount.spectators !== 1 ? "s" : ""}
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {isDM && healable.length > 0 && (
+            <button
+              onClick={() => emit("session:longRest", { joinCode })}
+              className="btn btn-ghost btn-sm text-xs flex items-center gap-1"
+              title="Heal all PCs, NPCs, and companions to full HP"
+            >
+              <Moon size={14} />
+              Long Rest
+            </button>
+          )}
+          {viewerCount && viewerCount.spectators > 0 && (
+            <span className="flex items-center gap-1 text-text-muted text-xs" title={`${viewerCount.players} player${viewerCount.players !== 1 ? "s" : ""}, ${viewerCount.spectators} spectator${viewerCount.spectators !== 1 ? "s" : ""}`}>
+              <Eye size={12} />
+              {viewerCount.spectators} spectator{viewerCount.spectators !== 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
       </div>
 
       {pcs.length > 0 && (

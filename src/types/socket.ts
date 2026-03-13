@@ -183,6 +183,7 @@ export type AddCompanionPayload = {
   initiativeBonus: number;
   armorClass: number;
 };
+export type LongRestPayload = { joinCode: string };
 export type ValidatePasswordPayload = { joinCode: string; password: string };
 
 // Server -> Client events
@@ -242,4 +243,5 @@ export interface ClientToServerEvents {
   "session:validatePassword": (data: ValidatePasswordPayload) => void;
   "session:getSettings": (data: { joinCode: string; dmToken: string }) => void;
   "player:addCompanion": (data: AddCompanionPayload) => void;
+  "session:longRest": (data: LongRestPayload) => void;
 }
