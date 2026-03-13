@@ -123,6 +123,11 @@ export type EndCombatPayload = {
   encounterId: string;
 };
 
+export type DeleteEncounterPayload = {
+  joinCode: string;
+  encounterId: string;
+};
+
 export type ReorderPayload = {
   joinCode: string;
   encounterId: string;
@@ -194,6 +199,7 @@ export interface ServerToClientEvents {
   "combat:started": (encounter: EncounterWithCombatants) => void;
   "combat:turnChanged": (encounter: EncounterWithCombatants) => void;
   "combat:ended": (encounter: EncounterWithCombatants) => void;
+  "encounter:deleted": (encounterId: string) => void;
   "dice:result": (roll: DiceRoll) => void;
   "notify:yourTurn": (combatantName: string) => void;
   "player:registered": (data: { combatantId: string; name: string }) => void;
@@ -223,6 +229,7 @@ export interface ClientToServerEvents {
   "combat:prevTurn": (data: PrevTurnPayload) => void;
   "combat:toggleActive": (data: ToggleActivePayload) => void;
   "combat:end": (data: EndCombatPayload) => void;
+  "encounter:delete": (data: DeleteEncounterPayload) => void;
   "combat:reorder": (data: ReorderPayload) => void;
   "instance:update": (data: UpdateInstancePayload) => void;
   "encounter:addCombatant": (data: AddToCombatPayload) => void;

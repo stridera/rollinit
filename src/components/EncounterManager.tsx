@@ -10,6 +10,7 @@ import {
   Dice6,
   Swords,
   CheckCircle,
+  Trash2,
 } from "lucide-react";
 import type {
   EncounterWithCombatants,
@@ -52,6 +53,7 @@ export function EncounterManager({
   const [monsterVisible, setMonsterVisible] = useState<Record<string, number>>({});
   const [monsterHidden, setMonsterHidden] = useState<Record<string, number>>({});
   const [excludedPcIds, setExcludedPcIds] = useState<Set<string>>(new Set());
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const monsters = combatants.filter((c) => c.type === "MONSTER");
   const pcsAndNpcs = combatants.filter(
@@ -264,45 +266,75 @@ export function EncounterManager({
           {encounters.map((enc) => {
             const isSelected = enc.id === (selectedEncounterId ?? activeEncounterId);
             const StatusIcon = STATUS_ICONS[enc.status] ?? Clock;
+            const isConfirmingDelete = confirmDeleteId === enc.id;
+            const canDelete = enc.status === "COMPLETED" || enc.status === "PREPARING";
             return (
-              <button
+              <div
                 key={enc.id}
-                onClick={() => {
-                  if (enc.status === "COMPLETED") {
-                    onSelectEncounter?.(
-                      selectedEncounterId === enc.id ? null : enc.id
-                    );
-                  } else {
-                    emit("encounter:select", {
-                      joinCode,
-                      encounterId: enc.id,
-                    });
-                    onSelectEncounter?.(null);
-                  }
-                }}
-                className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                className={`flex items-center gap-1 rounded-lg text-sm transition-colors ${
                   isSelected
                     ? "bg-bg-tertiary border border-accent-gold/30"
                     : "hover:bg-bg-tertiary"
                 }`}
               >
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">{enc.name}</span>
-                  <span
-                    className={`text-xs flex items-center gap-1 ${statusColors[enc.status]}`}
+                <button
+                  onClick={() => {
+                    if (enc.status === "COMPLETED") {
+                      onSelectEncounter?.(
+                        selectedEncounterId === enc.id ? null : enc.id
+                      );
+                    } else {
+                      emit("encounter:select", {
+                        joinCode,
+                        encounterId: enc.id,
+                      });
+                      onSelectEncounter?.(null);
+                    }
+                  }}
+                  className="flex-1 text-left px-3 py-2 min-w-0"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium truncate">{enc.name}</span>
+                    <span
+                      className={`text-xs flex items-center gap-1 shrink-0 ${statusColors[enc.status]}`}
+                    >
+                      <StatusIcon size={12} />
+                      {statusLabels[enc.status]}
+                    </span>
+                  </div>
+                  {enc.status === "ACTIVE" && (
+                    <p className="text-text-muted text-xs mt-0.5">
+                      Round {enc.roundNumber} &middot;{" "}
+                      {enc.combatants.filter((ec) => ec.isActive).length}{" "}
+                      combatants
+                    </p>
+                  )}
+                </button>
+                {canDelete && (
+                  <button
+                    onClick={() => {
+                      if (isConfirmingDelete) {
+                        emit("encounter:delete", { joinCode, encounterId: enc.id });
+                        setConfirmDeleteId(null);
+                        if (selectedEncounterId === enc.id) {
+                          onSelectEncounter?.(null);
+                        }
+                      } else {
+                        setConfirmDeleteId(enc.id);
+                        setTimeout(() => setConfirmDeleteId(null), 3000);
+                      }
+                    }}
+                    className={`p-2 rounded shrink-0 transition-colors ${
+                      isConfirmingDelete
+                        ? "text-accent-red bg-accent-red/10"
+                        : "text-text-muted hover:text-accent-red"
+                    }`}
+                    title={isConfirmingDelete ? "Click again to confirm delete" : "Delete encounter"}
                   >
-                    <StatusIcon size={12} />
-                    {statusLabels[enc.status]}
-                  </span>
-                </div>
-                {enc.status === "ACTIVE" && (
-                  <p className="text-text-muted text-xs mt-0.5">
-                    Round {enc.roundNumber} &middot;{" "}
-                    {enc.combatants.filter((ec) => ec.isActive).length}{" "}
-                    combatants
-                  </p>
+                    <Trash2 size={14} />
+                  </button>
                 )}
-              </button>
+              </div>
             );
           })}
         </div>

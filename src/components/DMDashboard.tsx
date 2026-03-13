@@ -140,6 +140,16 @@ export function DMDashboard({
       });
     }
 
+    function onEncounterDeleted(encounterId: string) {
+      setSessionState((prev) => {
+        if (!prev) return prev;
+        const encounters = prev.encounters.filter((e) => e.id !== encounterId);
+        const activeEncounterId =
+          prev.activeEncounterId === encounterId ? null : prev.activeEncounterId;
+        return { ...prev, encounters, activeEncounterId };
+      });
+    }
+
     function onLockChanged(data: { isLocked: boolean }) {
       setSessionState((prev) => {
         if (!prev) return prev;
@@ -170,6 +180,7 @@ export function DMDashboard({
     socket.on("combat:started", onEncounterUpdate);
     socket.on("combat:turnChanged", onEncounterUpdate);
     socket.on("combat:ended", onEncounterUpdate);
+    socket.on("encounter:deleted", onEncounterDeleted);
     socket.on("session:lockChanged", onLockChanged);
     socket.on("session:codeRegenerated", onCodeRegenerated);
     socket.on("session:viewerCount", onViewerCount);
@@ -184,6 +195,7 @@ export function DMDashboard({
       socket.off("combat:started", onEncounterUpdate);
       socket.off("combat:turnChanged", onEncounterUpdate);
       socket.off("combat:ended", onEncounterUpdate);
+      socket.off("encounter:deleted", onEncounterDeleted);
       socket.off("session:lockChanged", onLockChanged);
       socket.off("session:codeRegenerated", onCodeRegenerated);
       socket.off("session:viewerCount", onViewerCount);

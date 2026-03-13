@@ -877,6 +877,20 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
     emitEncounterUpdate(io, data.joinCode, encounter, "combat:ended");
   });
 
+  // --- Delete Encounter ---
+  socket.on("encounter:delete", async (data) => {
+    // Delete all encounter combatants first, then the encounter
+    await prisma.encounterCombatant.deleteMany({
+      where: { encounterId: data.encounterId },
+    });
+    await prisma.encounter.delete({
+      where: { id: data.encounterId },
+    });
+
+    io.to(`dm:${data.joinCode}`).emit("encounter:deleted", data.encounterId);
+    io.to(`session:${data.joinCode}`).emit("encounter:deleted", data.encounterId);
+  });
+
   // --- Add Combatant to Active Encounter ---
   socket.on("encounter:addCombatant", async (data) => {
     const encounter = await prisma.encounter.findUnique({

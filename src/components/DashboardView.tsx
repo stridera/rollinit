@@ -9,6 +9,7 @@ import { useWakeLock } from "@/hooks/useWakeLock";
 import { getTypeColor, getTypeLabel } from "@/lib/combatantTypes";
 import { HpTracker } from "./HpTracker";
 import { D20Icon } from "./D20Icon";
+import { Shield } from "lucide-react";
 
 const WAITING_MESSAGES = [
   "The DM prepares the encounter...",
@@ -123,8 +124,19 @@ export function DashboardView({ joinCode }: { joinCode: string }) {
     socket.on("combat:started", onEncounterUpdate);
     socket.on("combat:turnChanged", onEncounterUpdate);
     socket.on("combat:ended", onEncounterUpdate);
+    function onEncounterDeleted(encounterId: string) {
+      setSessionState((prev) => {
+        if (!prev) return prev;
+        const encounters = prev.encounters.filter((e) => e.id !== encounterId);
+        const activeEncounterId =
+          prev.activeEncounterId === encounterId ? null : prev.activeEncounterId;
+        return { ...prev, encounters, activeEncounterId };
+      });
+    }
+
     socket.on("session:lockChanged", onLockChanged);
     socket.on("session:settingsChanged", onSettingsChanged);
+    socket.on("encounter:deleted", onEncounterDeleted);
 
     return () => {
       socket.off("combatant:added", onCombatantAdded);
@@ -137,6 +149,7 @@ export function DashboardView({ joinCode }: { joinCode: string }) {
       socket.off("combat:ended", onEncounterUpdate);
       socket.off("session:lockChanged", onLockChanged);
       socket.off("session:settingsChanged", onSettingsChanged);
+      socket.off("encounter:deleted", onEncounterDeleted);
     };
   }, [socket, setSessionState]);
 
@@ -158,6 +171,11 @@ export function DashboardView({ joinCode }: { joinCode: string }) {
     : activeEntries;
 
   const showMonsterHpBar = sessionState?.showMonsterHpBar;
+
+  // Party members for the out-of-combat view (PCs, NPCs, Companions - not monsters)
+  const partyMembers = sessionState?.combatants.filter(
+    (c) => c.type === "PLAYER_CHARACTER" || c.type === "NPC" || c.type === "COMPANION"
+  ) ?? [];
 
   // Waiting state (DM not connected or no active encounter)
   if (dmActive === false || !activeEncounter) {
@@ -190,17 +208,70 @@ export function DashboardView({ joinCode }: { joinCode: string }) {
           </div>
         </div>
 
-        {/* Waiting content */}
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <D20Icon size={80} className="text-accent-gold mx-auto mb-6 opacity-30" />
-            <p
-              key={waitingMsgIdx}
-              className="text-text-secondary text-3xl italic animate-fade-in"
-            >
-              {WAITING_MESSAGES[waitingMsgIdx]}
-            </p>
-          </div>
+        {/* Party list or waiting content */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {partyMembers.length > 0 ? (
+            <div className="flex-1 overflow-auto px-6 py-4">
+              <p className="text-text-muted text-xs uppercase tracking-wider mb-3">Party</p>
+              <div className="space-y-2">
+                {partyMembers.map((c) => {
+                  const typeColor = getTypeColor(c.type);
+                  const typeLabel = getTypeLabel(c.type);
+                  const ownerName = c.type === "COMPANION" && c.ownerId
+                    ? partyMembers.find((p) => p.id === c.ownerId)?.name ?? null
+                    : null;
+                  return (
+                    <div
+                      key={c.id}
+                      className="flex items-center gap-4 px-4 py-2 rounded-xl bg-bg-secondary border border-border"
+                    >
+                      <div className="w-12 h-12 rounded-full flex items-center justify-center bg-bg-tertiary shrink-0">
+                        <Shield size={20} className="text-text-muted" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs font-medium ${typeColor}`}>{typeLabel}</span>
+                          <span className="text-xl font-medium truncate">{c.name}</span>
+                          {ownerName && (
+                            <span className="text-xs text-text-muted shrink-0">({ownerName})</span>
+                          )}
+                        </div>
+                        <div className="mt-1">
+                          <HpTracker
+                            currentHp={c.currentHp}
+                            maxHp={c.maxHp}
+                            onHpChange={() => {}}
+                            showControls={false}
+                            showExact={true}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-6 text-center">
+                <p
+                  key={waitingMsgIdx}
+                  className="text-text-muted text-lg italic animate-fade-in"
+                >
+                  {WAITING_MESSAGES[waitingMsgIdx]}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center">
+                <D20Icon size={80} className="text-accent-gold mx-auto mb-6 opacity-30" />
+                <p
+                  key={waitingMsgIdx}
+                  className="text-text-secondary text-3xl italic animate-fade-in"
+                >
+                  {WAITING_MESSAGES[waitingMsgIdx]}
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
