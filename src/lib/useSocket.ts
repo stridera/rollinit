@@ -52,6 +52,7 @@ export function useSocket(joinCode: string, isDM: boolean = false) {
 
     // If already connected, join immediately
     if (socket.connected) {
+      setConnected(true);
       socket.emit("session:join", { joinCode, isDM });
     }
 

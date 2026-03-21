@@ -87,20 +87,34 @@ export function PlayerView({ joinCode }: { joinCode: string }) {
         const { combatantId: storedId } = JSON.parse(stored);
         if (storedId) {
           emit("player:reconnect", { joinCode, combatantId: storedId });
-          const onError = () => {
-            localStorage.removeItem(`${STORAGE_KEY_PREFIX}${joinCode}`);
-            setIsReconnecting(false);
-          };
-          socket.once("error", onError);
-          const onRegistered = (data: { combatantId: string; name: string }) => {
-            socket.off("error", onError);
-            onPlayerRegistered(data);
-          };
-          socket.once("player:registered", onRegistered);
-          return () => {
+          let settled = false;
+          const cleanup = () => {
+            settled = true;
+            clearTimeout(timeout);
             socket.off("error", onError);
             socket.off("player:registered", onRegistered);
           };
+          const onError = () => {
+            if (settled) return;
+            cleanup();
+            localStorage.removeItem(`${STORAGE_KEY_PREFIX}${joinCode}`);
+            setIsReconnecting(false);
+          };
+          const onRegistered = (data: { combatantId: string; name: string }) => {
+            if (settled) return;
+            cleanup();
+            onPlayerRegistered(data);
+          };
+          // Timeout: if server never responds, fall back to join form
+          const timeout = setTimeout(() => {
+            if (settled) return;
+            cleanup();
+            localStorage.removeItem(`${STORAGE_KEY_PREFIX}${joinCode}`);
+            setIsReconnecting(false);
+          }, 5000);
+          socket.once("error", onError);
+          socket.once("player:registered", onRegistered);
+          return cleanup;
         }
       } catch {
         localStorage.removeItem(`${STORAGE_KEY_PREFIX}${joinCode}`);
