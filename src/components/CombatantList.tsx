@@ -258,7 +258,7 @@ function CombatantCard({
           <span className={`text-xs ${typeColor}`}>
             {getTypeLabel(combatant.type)}
           </span>
-          <span className="font-medium text-sm">{combatant.name}</span>
+          <span className={`font-medium text-sm ${combatant.type === "MONSTER" ? "text-accent-red" : ""}`}>{combatant.name}</span>
           {ownerName && (
             <span className="text-[10px] text-text-muted">({ownerName})</span>
           )}

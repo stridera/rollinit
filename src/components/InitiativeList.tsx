@@ -163,7 +163,7 @@ export function InitiativeList({
             >
               <div className="flex items-center gap-2">
                 <Skull size={12} className="text-accent-red/40" />
-                <span className="text-sm">{entry.displayName}</span>
+                <span className={`text-sm ${entry.combatant.type === "MONSTER" ? "text-accent-red" : ""}`}>{entry.displayName}</span>
                 {entry.initiative !== null && (
                   <span className="text-xs text-text-muted">
                     ({entry.initiative})
@@ -311,7 +311,7 @@ function InitiativeCard({
               </span>
               <span
                 className={`text-sm font-medium ${
-                  isCurrent ? "text-accent-gold" : ""
+                  isCurrent ? "text-accent-gold" : entry.combatant.type === "MONSTER" ? "text-accent-red" : ""
                 }`}
               >
                 {entry.displayName}

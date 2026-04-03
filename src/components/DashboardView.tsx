@@ -351,7 +351,7 @@ export function DashboardView({ joinCode }: { joinCode: string }) {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className={`text-xs font-medium ${typeColor}`}>{typeLabel}</span>
-                  <span className={`text-xl font-medium truncate ${isCurrent ? "text-accent-gold" : ""}`}>
+                  <span className={`text-xl font-medium truncate ${isCurrent ? "text-accent-gold" : entry.combatant.type === "MONSTER" ? "text-accent-red" : ""}`}>
                     {entry.displayName}
                   </span>
                   {ownerName && (

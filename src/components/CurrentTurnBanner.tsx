@@ -35,7 +35,7 @@ export function CurrentTurnBanner({
       <p className="text-text-muted text-xs uppercase tracking-wider mb-1">
         Current Turn
       </p>
-      <h2 className="text-4xl md:text-5xl text-accent-gold">
+      <h2 className={`text-4xl md:text-5xl ${currentEntry.combatant.type === "MONSTER" ? "text-accent-red" : "text-accent-gold"}`}>
         {currentEntry.displayName}
       </h2>
       <div className="flex items-center justify-center gap-3 text-text-secondary text-sm mt-2">
