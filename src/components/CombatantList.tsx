@@ -251,6 +251,14 @@ function CombatantCard({
     });
   }
 
+  function handleTempHpChange(tempHp: number) {
+    emit("combatant:update", {
+      joinCode,
+      combatantId: combatant.id,
+      updates: { tempHp },
+    });
+  }
+
   return (
     <div className="card py-2 px-3 space-y-2 animate-fade-in">
       <div className="flex items-center justify-between">
@@ -313,7 +321,9 @@ function CombatantCard({
         <HpTracker
           currentHp={combatant.currentHp}
           maxHp={combatant.maxHp}
+          tempHp={combatant.tempHp}
           onHpChange={handleHpChange}
+          onTempHpChange={(isDM || isPC || isCompanion) ? handleTempHpChange : undefined}
           showControls={isDM || isPC || isCompanion}
           showExact={isDM || isPC || isCompanion}
         />

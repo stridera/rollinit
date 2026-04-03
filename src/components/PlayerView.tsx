@@ -491,6 +491,14 @@ export function PlayerView({ joinCode }: { joinCode: string }) {
                 updates: { currentHp: newHp },
               });
             }}
+            onTempHpChange={(instanceId, tempHp) => {
+              emit("instance:update", {
+                joinCode,
+                encounterId: activeEncounter.id,
+                instanceId,
+                updates: { tempHp },
+              });
+            }}
           />
         )}
 

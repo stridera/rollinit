@@ -298,6 +298,15 @@ function InitiativeCard({
     });
   }
 
+  function handleTempHpChange(tempHp: number) {
+    emit("instance:update", {
+      joinCode,
+      encounterId,
+      instanceId: entry.id,
+      updates: { tempHp },
+    });
+  }
+
   return (
     <div
       draggable={draggable}
@@ -453,7 +462,9 @@ function InitiativeCard({
         <HpTracker
           currentHp={entry.currentHp}
           maxHp={entry.maxHp}
+          tempHp={entry.tempHp}
           onHpChange={handleHpChange}
+          onTempHpChange={showHpControls ? handleTempHpChange : undefined}
           showControls={showHpControls}
           showExact={showExactHp}
           hideBar={hideHpBar}

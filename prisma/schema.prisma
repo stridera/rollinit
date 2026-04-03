@@ -57,6 +57,7 @@ model Combatant {
   initiativeBonus Int           @default(0)
   maxHp           Int           @default(10)
   currentHp       Int           @default(10)
+  tempHp          Int           @default(0)
   armorClass      Int           @default(10)
   conditions      String[]      @default([])
   isHidden        Boolean       @default(false)
@@ -79,6 +80,7 @@ model EncounterCombatant {
   displayName     String
   currentHp       Int
   maxHp           Int
+  tempHp          Int           @default(0)
   armorClass      Int
   initiativeBonus Int      @default(0)
   conditions      String[] @default([])

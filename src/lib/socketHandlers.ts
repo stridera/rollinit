@@ -398,6 +398,7 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
       displayName: string;
       currentHp: number;
       maxHp: number;
+      tempHp: number;
       armorClass: number;
       initiativeBonus: number;
       conditions: string[];
@@ -408,12 +409,13 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
 
     let sortOrder = 0;
 
-    // Add PCs/NPCs — one instance each, copying current HP
+    // Add PCs/NPCs — one instance each, copying current HP and temp HP
     for (const c of autoJoinCombatants) {
       instanceData.push({
         displayName: c.name,
         currentHp: c.currentHp,
         maxHp: c.maxHp,
+        tempHp: c.tempHp,
         armorClass: c.armorClass,
         initiativeBonus: c.initiativeBonus,
         conditions: [...c.conditions],
@@ -429,6 +431,7 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
         displayName: c.name,
         currentHp: c.currentHp,
         maxHp: c.maxHp,
+        tempHp: c.tempHp,
         armorClass: c.armorClass,
         initiativeBonus: c.initiativeBonus,
         conditions: [...c.conditions],
@@ -463,6 +466,7 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
           displayName,
           currentHp: template.maxHp,
           maxHp: template.maxHp,
+          tempHp: 0,
           armorClass: template.armorClass,
           initiativeBonus: template.initiativeBonus,
           conditions: [],
@@ -527,14 +531,18 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
       });
     }
 
-    // PC/Companion HP sync-back: update session-level combatant HP
+    // PC/Companion sync-back: update session-level combatant HP and temp HP
     if (
-      data.updates.currentHp !== undefined &&
+      (data.updates.currentHp !== undefined || data.updates.tempHp !== undefined) &&
       (instance.combatant.type === "PLAYER_CHARACTER" || instance.combatant.type === "COMPANION")
     ) {
+      const syncData: Record<string, number> = {};
+      if (data.updates.currentHp !== undefined) syncData.currentHp = data.updates.currentHp;
+      if (data.updates.tempHp !== undefined) syncData.tempHp = data.updates.tempHp;
+
       const updated = await prisma.combatant.update({
         where: { id: instance.combatantId },
-        data: { currentHp: data.updates.currentHp },
+        data: syncData,
         include: { encounterCombatants: true },
       });
 
@@ -938,6 +946,7 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
         displayName,
         currentHp: isPC ? template.currentHp : template.maxHp,
         maxHp: template.maxHp,
+        tempHp: isPC ? template.tempHp : 0,
         armorClass: template.armorClass,
         initiativeBonus: template.initiativeBonus,
         conditions: isPC ? [...template.conditions] : [],
@@ -1305,11 +1314,11 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
 
       await prisma.$transaction(
         healed
-          .filter((c) => c.currentHp < c.maxHp)
+          .filter((c) => c.currentHp < c.maxHp || c.tempHp > 0)
           .map((c) =>
             prisma.combatant.update({
               where: { id: c.id },
-              data: { currentHp: c.maxHp },
+              data: { currentHp: c.maxHp, tempHp: 0 },
             })
           )
       );

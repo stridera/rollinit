@@ -253,6 +253,7 @@ export function DashboardView({ joinCode }: { joinCode: string }) {
                           <HpTracker
                             currentHp={c.currentHp}
                             maxHp={c.maxHp}
+                            tempHp={c.tempHp}
                             onHpChange={() => {}}
                             showControls={false}
                             showExact={true}
@@ -401,6 +402,7 @@ export function DashboardView({ joinCode }: { joinCode: string }) {
                   <HpTracker
                     currentHp={entry.currentHp}
                     maxHp={entry.maxHp}
+                    tempHp={entry.tempHp}
                     onHpChange={() => {}}
                     showControls={false}
                     showExact={showExact}

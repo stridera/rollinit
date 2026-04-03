@@ -10,11 +10,13 @@ export function CurrentTurnBanner({
   showMonsterHpBar,
   showHpControls,
   onHpChange,
+  onTempHpChange,
 }: {
   encounter: EncounterWithCombatants;
   showMonsterHpBar?: boolean;
   showHpControls?: boolean;
   onHpChange?: (instanceId: string, newHp: number) => void;
+  onTempHpChange?: (instanceId: string, tempHp: number) => void;
 }) {
   const activeEntries = encounter.combatants.filter(
     (ec) => ec.isActive
@@ -55,7 +57,9 @@ export function CurrentTurnBanner({
         <HpTracker
           currentHp={currentEntry.currentHp}
           maxHp={currentEntry.maxHp}
+          tempHp={currentEntry.tempHp}
           onHpChange={(newHp) => onHpChange?.(currentEntry.id, newHp)}
+          onTempHpChange={showHpControls ? (tempHp) => onTempHpChange?.(currentEntry.id, tempHp) : undefined}
           showControls={!!showHpControls}
           showExact={showExact}
           hideBar={hideBar}

@@ -49,6 +49,7 @@ export type UpdateCombatantPayload = {
     initiativeBonus: number;
     maxHp: number;
     currentHp: number;
+    tempHp: number;
     armorClass: number;
     conditions: string[];
     isHidden: boolean;
@@ -141,6 +142,7 @@ export type UpdateInstancePayload = {
   instanceId: string;
   updates: Partial<{
     currentHp: number;
+    tempHp: number;
     conditions: string[];
     isHidden: boolean;
   }>;
