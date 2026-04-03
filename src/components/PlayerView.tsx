@@ -12,6 +12,7 @@ import { DiceRoller } from "./DiceRoller";
 import { DiceLog } from "./DiceLog";
 import { NotificationPermission } from "./NotificationPermission";
 import { D20Icon } from "./D20Icon";
+import { AdvBadge } from "./AdvBadge";
 import { useFullscreen } from "@/hooks/useFullscreen";
 import { useWakeLock } from "@/hooks/useWakeLock";
 
@@ -41,6 +42,7 @@ export function PlayerView({ joinCode }: { joinCode: string }) {
   const [maxHpInput, setMaxHpInput] = useState(10);
   const [initBonusInput, setInitBonusInput] = useState(0);
   const [acInput, setAcInput] = useState(10);
+  const [initAdvantageInput, setInitAdvantageInput] = useState(false);
 
   const { socket, connected, sessionState, setSessionState, dmActive, error, emit } =
     useSocket(joinCode, false);
@@ -267,6 +269,7 @@ export function PlayerView({ joinCode }: { joinCode: string }) {
       maxHp: maxHpInput,
       initiativeBonus: initBonusInput,
       armorClass: acInput,
+      initiativeAdvantage: initAdvantageInput,
     });
   }
 
@@ -384,6 +387,14 @@ export function PlayerView({ joinCode }: { joinCode: string }) {
                   className="w-full text-sm text-center"
                 />
               </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <AdvBadge
+                active={initAdvantageInput}
+                onClick={() => setInitAdvantageInput(!initAdvantageInput)}
+              />
+              <span className="text-sm text-text-secondary">Initiative Advantage</span>
             </div>
 
             <button

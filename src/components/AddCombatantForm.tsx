@@ -5,6 +5,7 @@ import { Ghost, User, Plus, PawPrint } from "lucide-react";
 import { NumericInput } from "./NumericInput";
 import type { CombatantType } from "@prisma/client";
 import type { ClientToServerEvents, CombatantWithInstances } from "@/types/socket";
+import { AdvBadge } from "./AdvBadge";
 import { SRD_MONSTERS, type SrdMonster } from "@/data/srd-monsters";
 
 type EmitFn = <E extends keyof ClientToServerEvents>(
@@ -28,6 +29,7 @@ export function AddCombatantForm({
   const [initiativeBonus, setInitiativeBonus] = useState(0);
   const [maxHp, setMaxHp] = useState(10);
   const [armorClass, setArmorClass] = useState(10);
+  const [initiativeAdvantage, setInitiativeAdvantage] = useState(false);
   const [search, setSearch] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -80,6 +82,7 @@ export function AddCombatantForm({
       maxHp,
       armorClass,
       isHidden: false,
+      initiativeAdvantage,
       ...(tab === "COMPANION" && ownerId ? { ownerId } : {}),
     });
 
@@ -87,6 +90,7 @@ export function AddCombatantForm({
     setInitiativeBonus(0);
     setMaxHp(10);
     setArmorClass(10);
+    setInitiativeAdvantage(false);
     setSearch("");
     setOwnerId("");
   }
@@ -246,6 +250,14 @@ export function AddCombatantForm({
               className="w-full text-center"
             />
           </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <AdvBadge
+            active={initiativeAdvantage}
+            onClick={() => setInitiativeAdvantage(!initiativeAdvantage)}
+          />
+          <span className="text-sm text-text-secondary">Initiative Advantage</span>
         </div>
 
         <button

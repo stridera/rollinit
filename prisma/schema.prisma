@@ -62,6 +62,7 @@ model Combatant {
   conditions      String[]      @default([])
   isHidden        Boolean       @default(false)
   autoJoin        Boolean       @default(true)
+  initiativeAdvantage Boolean   @default(false)
   playerSocketId  String?
   createdAt       DateTime      @default(now())
 
@@ -85,6 +86,7 @@ model EncounterCombatant {
   initiativeBonus Int      @default(0)
   conditions      String[] @default([])
   isHidden        Boolean  @default(false)
+  initiativeAdvantage Boolean @default(false)
   initiative      Int?
   isActive        Boolean  @default(true)
   sortOrder       Int      @default(0)

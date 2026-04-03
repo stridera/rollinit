@@ -13,6 +13,7 @@ import {
 import type { EncounterWithCombatants, ClientToServerEvents } from "@/types/socket";
 import { getTypeColor, getTypeLabel } from "@/lib/combatantTypes";
 import { HpTracker } from "./HpTracker";
+import { AdvBadge } from "./AdvBadge";
 
 type EmitFn = <E extends keyof ClientToServerEvents>(
   event: E,
@@ -358,6 +359,9 @@ function InitiativeCard({
                   ({ownerName})
                 </span>
               )}
+              {!(isDM && isRolling && entry.initiative === null) && (
+                <AdvBadge active={entry.initiativeAdvantage} />
+              )}
               {entry.isHidden && isDM && (
                 <span className="text-[10px] bg-accent-purple/20 text-accent-purple px-1.5 py-0.5 rounded">
                   Hidden
@@ -380,6 +384,20 @@ function InitiativeCard({
         <div className="flex items-center gap-2">
           {!readOnly && isRolling && entry.initiative === null && (isDM || entry.combatantId === playerCombatantId || (playerCombatantId && entry.combatant.ownerId === playerCombatantId)) && (
             <>
+              {isDM && (
+                <AdvBadge
+                  active={entry.initiativeAdvantage}
+                  onClick={() =>
+                    emit("instance:update", {
+                      joinCode,
+                      encounterId,
+                      instanceId: entry.id,
+                      updates: { initiativeAdvantage: !entry.initiativeAdvantage },
+                    })
+                  }
+                  title={entry.initiativeAdvantage ? "Remove initiative advantage" : "Grant initiative advantage"}
+                />
+              )}
               {(isDM || physicalDice) && (
                 <div className="flex items-center gap-1">
                   <input

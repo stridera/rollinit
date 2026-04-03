@@ -185,52 +185,52 @@ export function HpTracker({
       {/* Controls */}
       {showControls && (
         <>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center justify-center gap-0.5">
+            <button
+              onClick={() => quickAdjust(-5)}
+              className="btn btn-ghost btn-sm text-xs px-1.5 text-accent-red"
+            >
+              -5
+            </button>
             <button
               onClick={() => quickAdjust(-1)}
-              className="btn btn-ghost btn-sm text-xs px-2 text-accent-red"
+              className="btn btn-ghost btn-sm text-xs px-1.5 text-accent-red"
             >
               -1
             </button>
             <button
-              onClick={() => quickAdjust(-5)}
-              className="btn btn-ghost btn-sm text-xs px-2 text-accent-red"
+              onClick={() => applyHp("damage")}
+              disabled={!hpDelta}
+              className="btn btn-ghost btn-sm text-xs px-1.5 text-accent-red"
             >
-              -5
+              <Sword size={12} />
+              Dmg
             </button>
             <input
               type="number"
               value={hpDelta}
               onChange={(e) => setHpDelta(e.target.value)}
               placeholder="HP"
-              className="w-14 text-xs text-center py-1 px-1"
+              className="w-12 text-xs text-center py-1 px-1"
               min={1}
             />
             <button
-              onClick={() => applyHp("damage")}
-              disabled={!hpDelta}
-              className="btn btn-ghost btn-sm text-xs px-2 text-accent-red"
-            >
-              <Sword size={12} />
-              Dmg
-            </button>
-            <button
               onClick={() => applyHp("heal")}
               disabled={!hpDelta}
-              className="btn btn-ghost btn-sm text-xs px-2 text-accent-green"
+              className="btn btn-ghost btn-sm text-xs px-1.5 text-accent-green"
             >
               <Heart size={12} />
               Heal
             </button>
             <button
               onClick={() => quickAdjust(1)}
-              className="btn btn-ghost btn-sm text-xs px-2 text-accent-green"
+              className="btn btn-ghost btn-sm text-xs px-1.5 text-accent-green"
             >
               +1
             </button>
             <button
               onClick={() => quickAdjust(5)}
-              className="btn btn-ghost btn-sm text-xs px-2 text-accent-green"
+              className="btn btn-ghost btn-sm text-xs px-1.5 text-accent-green"
             >
               +5
             </button>

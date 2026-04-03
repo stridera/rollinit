@@ -38,6 +38,7 @@ export type AddCombatantPayload = {
   maxHp: number;
   armorClass: number;
   isHidden: boolean;
+  initiativeAdvantage?: boolean;
   ownerId?: string;
 };
 
@@ -54,6 +55,7 @@ export type UpdateCombatantPayload = {
     conditions: string[];
     isHidden: boolean;
     autoJoin: boolean;
+    initiativeAdvantage: boolean;
     playerSocketId: string | null;
   }>;
 };
@@ -145,6 +147,7 @@ export type UpdateInstancePayload = {
     tempHp: number;
     conditions: string[];
     isHidden: boolean;
+    initiativeAdvantage: boolean;
   }>;
 };
 
@@ -169,6 +172,7 @@ export type PlayerRegisterPayload = {
   maxHp: number;
   initiativeBonus: number;
   armorClass: number;
+  initiativeAdvantage?: boolean;
 };
 export type PlayerReconnectPayload = { joinCode: string; combatantId: string };
 export type UpdateSettingsPayload = {

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Pencil, Check, Trash2, Swords, CheckCircle, Eye, Moon } from "lucide-react";
 import { NumericInput } from "./NumericInput";
+import { AdvBadge } from "./AdvBadge";
 import type { CombatantWithInstances, ClientToServerEvents } from "@/types/socket";
 import type { EncounterStatus } from "@prisma/client";
 import { getTypeColor, getTypeLabel } from "@/lib/combatantTypes";
@@ -292,6 +293,7 @@ function CombatantCard({
             Init {combatant.initiativeBonus >= 0 ? "+" : ""}
             {combatant.initiativeBonus}
           </span>
+          <AdvBadge active={combatant.initiativeAdvantage} />
           {isDM && (
             <div className="flex gap-1">
               <button
@@ -412,6 +414,7 @@ function CombatantEditor({
   const [initBonus, setInitBonus] = useState(combatant.initiativeBonus);
   const [ac, setAc] = useState(combatant.armorClass);
   const [maxHp, setMaxHp] = useState(combatant.maxHp);
+  const [initAdvantage, setInitAdvantage] = useState(combatant.initiativeAdvantage);
 
   function save() {
     emit("combatant:update", {
@@ -423,6 +426,7 @@ function CombatantEditor({
         armorClass: ac,
         maxHp,
         currentHp: Math.min(combatant.currentHp, maxHp),
+        initiativeAdvantage: initAdvantage,
       },
     });
   }
@@ -463,6 +467,13 @@ function CombatantEditor({
             className="w-full text-sm text-center"
           />
         </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <AdvBadge
+          active={initAdvantage}
+          onClick={() => setInitAdvantage(!initAdvantage)}
+        />
+        <span className="text-xs text-text-secondary">Initiative Advantage</span>
       </div>
       <button onClick={save} className="btn btn-primary btn-sm w-full">
         Save Changes

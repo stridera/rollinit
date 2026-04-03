@@ -222,6 +222,7 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
         name: capitalizeFirst(data.name),
         type: data.type,
         initiativeBonus: data.initiativeBonus,
+        initiativeAdvantage: data.initiativeAdvantage ?? false,
         maxHp: data.maxHp,
         currentHp: data.maxHp,
         armorClass: data.armorClass,
@@ -406,6 +407,7 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
       tempHp: number;
       armorClass: number;
       initiativeBonus: number;
+      initiativeAdvantage: boolean;
       conditions: string[];
       isHidden: boolean;
       combatantId: string;
@@ -423,6 +425,7 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
         tempHp: c.tempHp,
         armorClass: c.armorClass,
         initiativeBonus: c.initiativeBonus,
+        initiativeAdvantage: c.initiativeAdvantage,
         conditions: [...c.conditions],
         isHidden: c.isHidden,
         combatantId: c.id,
@@ -439,6 +442,7 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
         tempHp: c.tempHp,
         armorClass: c.armorClass,
         initiativeBonus: c.initiativeBonus,
+        initiativeAdvantage: c.initiativeAdvantage,
         conditions: [...c.conditions],
         isHidden: c.isHidden,
         combatantId: c.id,
@@ -474,6 +478,7 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
           tempHp: 0,
           armorClass: template.armorClass,
           initiativeBonus: template.initiativeBonus,
+          initiativeAdvantage: template.initiativeAdvantage,
           conditions: [],
           isHidden: entry.isHidden,
           combatantId: template.id,
@@ -618,7 +623,20 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
       }
     }
 
-    const roll = data.value ?? Math.floor(Math.random() * 20) + 1;
+    let roll: number;
+    let rolls: number[];
+    if (data.value !== undefined) {
+      roll = data.value;
+      rolls = [roll];
+    } else if (instance.initiativeAdvantage) {
+      const r1 = Math.floor(Math.random() * 20) + 1;
+      const r2 = Math.floor(Math.random() * 20) + 1;
+      roll = Math.max(r1, r2);
+      rolls = [r1, r2];
+    } else {
+      roll = Math.floor(Math.random() * 20) + 1;
+      rolls = [roll];
+    }
     const total = roll + instance.initiativeBonus;
 
     await prisma.encounterCombatant.update({
@@ -627,10 +645,13 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
     });
 
     // Log initiative roll to dice log
+    const notation = instance.initiativeAdvantage && data.value === undefined
+      ? `2d20kh1${instance.initiativeBonus >= 0 ? "+" : ""}${instance.initiativeBonus}`
+      : `1d20${instance.initiativeBonus >= 0 ? "+" : ""}${instance.initiativeBonus}`;
     const diceRoll = await prisma.diceRoll.create({
       data: {
-        notation: `1d20${instance.initiativeBonus >= 0 ? "+" : ""}${instance.initiativeBonus}`,
-        rolls: [roll],
+        notation,
+        rolls,
         modifier: instance.initiativeBonus,
         total,
         rollerName: `${instance.displayName} (Initiative)`,
@@ -674,7 +695,17 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
     });
 
     for (const instance of instances) {
-      const roll = Math.floor(Math.random() * 20) + 1;
+      let roll: number;
+      let rolls: number[];
+      if (instance.initiativeAdvantage) {
+        const r1 = Math.floor(Math.random() * 20) + 1;
+        const r2 = Math.floor(Math.random() * 20) + 1;
+        roll = Math.max(r1, r2);
+        rolls = [r1, r2];
+      } else {
+        roll = Math.floor(Math.random() * 20) + 1;
+        rolls = [roll];
+      }
       const total = roll + instance.initiativeBonus;
       await prisma.encounterCombatant.update({
         where: { id: instance.id },
@@ -682,10 +713,13 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
       });
 
       // Log initiative roll to dice log
+      const notation = instance.initiativeAdvantage
+        ? `2d20kh1${instance.initiativeBonus >= 0 ? "+" : ""}${instance.initiativeBonus}`
+        : `1d20${instance.initiativeBonus >= 0 ? "+" : ""}${instance.initiativeBonus}`;
       const diceRoll = await prisma.diceRoll.create({
         data: {
-          notation: `1d20${instance.initiativeBonus >= 0 ? "+" : ""}${instance.initiativeBonus}`,
-          rolls: [roll],
+          notation,
+          rolls,
           modifier: instance.initiativeBonus,
           total,
           rollerName: `${instance.displayName} (Initiative)`,
@@ -958,6 +992,7 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
         tempHp: isPC ? template.tempHp : 0,
         armorClass: template.armorClass,
         initiativeBonus: template.initiativeBonus,
+        initiativeAdvantage: template.initiativeAdvantage,
         conditions: isPC ? [...template.conditions] : [],
         isHidden: template.isHidden,
         isActive: true,
@@ -1166,6 +1201,7 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
           maxHp: data.maxHp,
           armorClass: data.armorClass,
           initiativeBonus: data.initiativeBonus,
+          initiativeAdvantage: data.initiativeAdvantage ?? false,
         },
         include: { encounterCombatants: true },
       });
@@ -1186,6 +1222,7 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
           name: capitalizeFirst(data.name),
           type: "PLAYER_CHARACTER",
           initiativeBonus: data.initiativeBonus,
+          initiativeAdvantage: data.initiativeAdvantage ?? false,
           maxHp: data.maxHp,
           currentHp: data.maxHp,
           armorClass: data.armorClass,
