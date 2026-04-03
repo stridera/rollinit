@@ -5,6 +5,7 @@ import {
   GripVertical,
   Skull,
   Eye,
+  EyeOff,
   Dice6,
   Check,
   HeartPulse,
@@ -411,6 +412,22 @@ function InitiativeCard({
             >
               <Eye size={14} />
               Reveal
+            </button>
+          )}
+          {!readOnly && isDM && !entry.isHidden && entry.combatant.type === "MONSTER" && !isRolling && (
+            <button
+              onClick={() =>
+                emit("instance:update", {
+                  joinCode,
+                  encounterId,
+                  instanceId: entry.id,
+                  updates: { isHidden: true },
+                })
+              }
+              className="btn btn-ghost btn-sm text-xs text-accent-purple"
+              title="Hide from players"
+            >
+              <EyeOff size={14} />
             </button>
           )}
           {!readOnly && isDM && !isRolling && (
