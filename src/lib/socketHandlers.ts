@@ -16,6 +16,11 @@ function capitalizeFirst(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+// Dead PCs/NPCs/Companions stay in turn order for death saves; dead monsters do not
+function isInTurnOrder(ec: { isActive: boolean; combatant: { type: string } }): boolean {
+  return ec.isActive || ec.combatant.type !== "MONSTER";
+}
+
 async function getSessionState(joinCode: string): Promise<SessionState | null> {
   const session = await prisma.session.findUnique({
     where: { joinCode },
@@ -276,7 +281,7 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
           where: { id: ec.encounterId },
           include: {
             combatants: {
-              where: { isActive: true },
+              include: { combatant: true },
               orderBy: { sortOrder: "asc" },
             },
           },
@@ -284,7 +289,7 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
         if (enc) {
           affectedEncounters.push({
             encounterId: enc.id,
-            oldActiveIds: enc.combatants.map((c) => c.id),
+            oldActiveIds: enc.combatants.filter(isInTurnOrder).map((c) => c.id),
             oldTurnIdx: enc.status === "ACTIVE" ? enc.currentTurnIdx : -1,
           });
         }
@@ -310,7 +315,7 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
 
       if (encounter.status === "ACTIVE" && oldTurnIdx >= 0) {
         const newActiveIds = encounter.combatants
-          .filter((ec) => ec.isActive)
+          .filter(isInTurnOrder)
           .map((ec) => ec.id);
         const oldCurrentId = oldActiveIds[oldTurnIdx];
         let newIdx: number;
@@ -738,19 +743,20 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
       where: { id: data.encounterId },
       include: {
         combatants: {
-          where: { isActive: true },
           include: { combatant: true },
           orderBy: { sortOrder: "asc" },
         },
       },
     });
 
-    if (!encounter || encounter.combatants.length === 0) return;
+    if (!encounter) return;
+    const turnOrder = encounter.combatants.filter(isInTurnOrder);
+    if (turnOrder.length === 0) return;
 
     let nextIdx = encounter.currentTurnIdx + 1;
     let roundNumber = encounter.roundNumber;
 
-    if (nextIdx >= encounter.combatants.length) {
+    if (nextIdx >= turnOrder.length) {
       nextIdx = 0;
       roundNumber++;
     }
@@ -775,20 +781,21 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
       where: { id: data.encounterId },
       include: {
         combatants: {
-          where: { isActive: true },
           include: { combatant: true },
           orderBy: { sortOrder: "asc" },
         },
       },
     });
 
-    if (!encounter || encounter.combatants.length === 0) return;
+    if (!encounter) return;
+    const turnOrder = encounter.combatants.filter(isInTurnOrder);
+    if (turnOrder.length === 0) return;
 
     let prevIdx = encounter.currentTurnIdx - 1;
     let roundNumber = encounter.roundNumber;
 
     if (prevIdx < 0) {
-      prevIdx = encounter.combatants.length - 1;
+      prevIdx = turnOrder.length - 1;
       roundNumber = Math.max(1, roundNumber - 1);
     }
 
@@ -835,10 +842,12 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
   });
 
   socket.on("combat:reorder", async (data) => {
-    const combatants = await prisma.encounterCombatant.findMany({
-      where: { encounterId: data.encounterId, isActive: true },
+    const allCombatants = await prisma.encounterCombatant.findMany({
+      where: { encounterId: data.encounterId },
+      include: { combatant: true },
       orderBy: { sortOrder: "asc" },
     });
+    const combatants = allCombatants.filter(isInTurnOrder);
 
     const draggedIdx = combatants.findIndex((c) => c.id === data.instanceId);
     if (draggedIdx === -1) return;
@@ -1432,25 +1441,23 @@ function emitEncounterUpdate(
 
   // Adjust currentTurnIdx for player view if needed
   if (encounter.status === "ACTIVE") {
-    const activeEntries = encounter.combatants.filter((ec) => ec.isActive);
-    const currentEntry = activeEntries[encounter.currentTurnIdx];
+    const turnOrderEntries = encounter.combatants.filter(isInTurnOrder);
+    const currentEntry = turnOrderEntries[encounter.currentTurnIdx];
     if (currentEntry?.isHidden) {
-      const visibleActive = activeEntries.filter((ec) => !ec.isHidden);
+      const visibleTurnOrder = turnOrderEntries.filter((ec) => !ec.isHidden);
       let adjustedIdx = encounter.currentTurnIdx - 1;
-      while (adjustedIdx >= 0 && activeEntries[adjustedIdx]?.isHidden) {
+      while (adjustedIdx >= 0 && turnOrderEntries[adjustedIdx]?.isHidden) {
         adjustedIdx--;
       }
       if (adjustedIdx >= 0) {
-        const visibleEntry = activeEntries[adjustedIdx];
-        playerView.currentTurnIdx = visibleActive.findIndex(
+        const visibleEntry = turnOrderEntries[adjustedIdx];
+        playerView.currentTurnIdx = visibleTurnOrder.findIndex(
           (ec) => ec.id === visibleEntry.id
         );
       }
     } else if (currentEntry) {
-      const visibleActive = playerView.combatants.filter(
-        (ec) => ec.isActive
-      );
-      playerView.currentTurnIdx = visibleActive.findIndex(
+      const visibleTurnOrder = playerView.combatants.filter(isInTurnOrder);
+      playerView.currentTurnIdx = visibleTurnOrder.findIndex(
         (ec) => ec.id === currentEntry.id
       );
     }
@@ -1466,8 +1473,8 @@ function notifyCurrentTurn(
   joinCode: string,
   encounter: EncounterWithCombatants
 ) {
-  const activeEntries = encounter.combatants.filter((ec) => ec.isActive);
-  const currentEntry = activeEntries[encounter.currentTurnIdx];
+  const turnOrderEntries = encounter.combatants.filter(isInTurnOrder);
+  const currentEntry = turnOrderEntries[encounter.currentTurnIdx];
   if (!currentEntry) return;
 
   // Notify player whose turn it is

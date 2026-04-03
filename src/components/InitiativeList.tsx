@@ -65,7 +65,7 @@ export function InitiativeList({
 
   // Rotate so current turn is at top (both DM and player views)
   const isActive = encounter.status === "ACTIVE";
-  const currentTurnEntry = isActive ? activeEntries[encounter.currentTurnIdx] : null;
+  const currentTurnEntry = isActive ? allInLineEntries[encounter.currentTurnIdx] : null;
   const currentTurnAllIdx = currentTurnEntry
     ? allInLineEntries.indexOf(currentTurnEntry)
     : -1;
@@ -105,7 +105,7 @@ export function InitiativeList({
             const isEntryDead = !entry.isActive;
 
             // Always use original index for current turn detection
-            const originalIdx = activeEntries.indexOf(entry);
+            const originalIdx = allInLineEntries.indexOf(entry);
             const isCurrent =
               isActive && originalIdx === encounter.currentTurnIdx;
 

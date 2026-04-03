@@ -172,7 +172,7 @@ export function DashboardView({ joinCode }: { joinCode: string }) {
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
   // Rotate so current turn is at top
-  const currentTurnEntry = isActive ? activeEntries[activeEncounter!.currentTurnIdx] : null;
+  const currentTurnEntry = isActive ? allInLineEntries[activeEncounter!.currentTurnIdx] : null;
   const currentTurnAllIdx = currentTurnEntry
     ? allInLineEntries.indexOf(currentTurnEntry)
     : -1;
@@ -334,7 +334,7 @@ export function DashboardView({ joinCode }: { joinCode: string }) {
           let activeSeenCount = 0;
           return displayEntries.map((entry) => {
           const isEntryDead = !entry.isActive;
-          const originalIdx = activeEntries.indexOf(entry);
+          const originalIdx = allInLineEntries.indexOf(entry);
           const isCurrent = isActive && originalIdx === activeEncounter!.currentTurnIdx;
 
           // Position labels only for active entries

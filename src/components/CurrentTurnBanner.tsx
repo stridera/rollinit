@@ -18,10 +18,10 @@ export function CurrentTurnBanner({
   onHpChange?: (instanceId: string, newHp: number) => void;
   onTempHpChange?: (instanceId: string, tempHp: number) => void;
 }) {
-  const activeEntries = encounter.combatants.filter(
-    (ec) => ec.isActive
-  );
-  const currentEntry = activeEntries[encounter.currentTurnIdx];
+  const turnOrderEntries = encounter.combatants
+    .filter((ec) => ec.isActive || ec.combatant.type !== "MONSTER")
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+  const currentEntry = turnOrderEntries[encounter.currentTurnIdx];
 
   if (!currentEntry) return null;
 

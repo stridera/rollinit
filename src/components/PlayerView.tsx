@@ -478,8 +478,10 @@ export function PlayerView({ joinCode }: { joinCode: string }) {
             encounter={activeEncounter}
             showMonsterHpBar={sessionState?.showMonsterHpBar}
             showHpControls={(() => {
-              const activeEntries = activeEncounter.combatants.filter((ec) => ec.isActive);
-              const current = activeEntries[activeEncounter.currentTurnIdx];
+              const turnOrder = activeEncounter.combatants
+                .filter((ec) => ec.isActive || ec.combatant.type !== "MONSTER")
+                .sort((a, b) => a.sortOrder - b.sortOrder);
+              const current = turnOrder[activeEncounter.currentTurnIdx];
               if (!current) return false;
               return !!(combatantId && (current.combatantId === combatantId || current.combatant.ownerId === combatantId));
             })()}
