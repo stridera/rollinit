@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Maximize2, Minimize2, MonitorSmartphone } from "lucide-react";
+import { Maximize2, Minimize2, MonitorSmartphone, Skull } from "lucide-react";
 import { useSocket } from "@/lib/useSocket";
 import type { CombatantWithInstances, EncounterWithCombatants } from "@/types/socket";
 import { useFullscreen } from "@/hooks/useFullscreen";
@@ -162,13 +162,26 @@ export function DashboardView({ joinCode }: { joinCode: string }) {
     .filter((ec) => ec.isActive)
     .sort((a, b) => a.sortOrder - b.sortOrder) ?? [];
 
+  // Dead non-monsters stay in initiative order (for death saves)
+  const deadInLineEntries = activeEncounter?.combatants.filter(
+    (ec) => !ec.isActive && ec.combatant.type !== "MONSTER"
+  ) ?? [];
+
+  // Combine active + dead-in-line entries, sorted by original sort order
+  const allInLineEntries = [...activeEntries, ...deadInLineEntries]
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+
   // Rotate so current turn is at top
-  const displayEntries = isActive && activeEntries.length > 0 && activeEncounter!.currentTurnIdx > 0
+  const currentTurnEntry = isActive ? activeEntries[activeEncounter!.currentTurnIdx] : null;
+  const currentTurnAllIdx = currentTurnEntry
+    ? allInLineEntries.indexOf(currentTurnEntry)
+    : -1;
+  const displayEntries = isActive && currentTurnAllIdx > 0
     ? [
-        ...activeEntries.slice(activeEncounter!.currentTurnIdx),
-        ...activeEntries.slice(0, activeEncounter!.currentTurnIdx),
+        ...allInLineEntries.slice(currentTurnAllIdx),
+        ...allInLineEntries.slice(0, currentTurnAllIdx),
       ]
-    : activeEntries;
+    : allInLineEntries;
 
   const showMonsterHpBar = sessionState?.showMonsterHpBar;
 
@@ -316,9 +329,19 @@ export function DashboardView({ joinCode }: { joinCode: string }) {
 
       {/* Main area */}
       <div className="flex-1 overflow-hidden flex flex-col px-6 py-4 gap-2">
-        {displayEntries.map((entry, idx) => {
+        {(() => {
+          let activeSeenCount = 0;
+          return displayEntries.map((entry) => {
+          const isEntryDead = !entry.isActive;
           const originalIdx = activeEntries.indexOf(entry);
           const isCurrent = isActive && originalIdx === activeEncounter!.currentTurnIdx;
+
+          // Position labels only for active entries
+          let isOnDeck = false;
+          if (isActive && !isEntryDead) {
+            if (activeSeenCount === 1) isOnDeck = true;
+            activeSeenCount++;
+          }
 
           const typeColor = getTypeColor(entry.combatant.type);
           const typeLabel = getTypeLabel(entry.combatant.type);
@@ -336,7 +359,9 @@ export function DashboardView({ joinCode }: { joinCode: string }) {
               className={`flex items-center gap-4 px-4 py-2 rounded-xl transition-all duration-300 shrink ${
                 isCurrent
                   ? "bg-accent-gold/10 border-2 border-accent-gold"
-                  : "bg-bg-secondary border border-border"
+                  : isEntryDead
+                    ? "combatant-dead bg-bg-secondary border border-border"
+                    : "bg-bg-secondary border border-border"
               }`}
               style={{ minHeight: 0 }}
             >
@@ -351,6 +376,9 @@ export function DashboardView({ joinCode }: { joinCode: string }) {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className={`text-xs font-medium ${typeColor}`}>{typeLabel}</span>
+                  {isEntryDead && (
+                    <Skull size={16} className="text-accent-red shrink-0" />
+                  )}
                   <span className={`text-xl font-medium truncate ${isCurrent ? "text-accent-gold" : entry.combatant.type === "MONSTER" ? "text-accent-red" : ""}`}>
                     {entry.displayName}
                   </span>
@@ -362,7 +390,7 @@ export function DashboardView({ joinCode }: { joinCode: string }) {
                       NOW
                     </span>
                   )}
-                  {idx === 1 && isActive && (
+                  {isOnDeck && (
                     <span className="text-xs text-text-muted uppercase tracking-wider shrink-0">
                       On Deck
                     </span>
@@ -382,7 +410,8 @@ export function DashboardView({ joinCode }: { joinCode: string }) {
               </div>
             </div>
           );
-        })}
+        });
+        })()}
       </div>
     </div>
   );

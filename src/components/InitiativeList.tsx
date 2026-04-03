@@ -49,21 +49,36 @@ export function InitiativeList({
     .filter((ec) => ec.isActive)
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
-  const deadEntries = encounter.combatants.filter((ec) => !ec.isActive);
+  // Dead non-monsters stay in initiative order (for death saves)
+  // Only dead monsters go to the "Fallen" section
+  const deadInLineEntries = encounter.combatants.filter(
+    (ec) => !ec.isActive && ec.combatant.type !== "MONSTER"
+  );
+  const deadMonsterEntries = encounter.combatants.filter(
+    (ec) => !ec.isActive && ec.combatant.type === "MONSTER"
+  );
+
+  // Combine active + dead-in-line entries, sorted by original sort order
+  const allInLineEntries = [...activeEntries, ...deadInLineEntries]
+    .sort((a, b) => a.sortOrder - b.sortOrder);
 
   // Rotate so current turn is at top (both DM and player views)
   const isActive = encounter.status === "ACTIVE";
-  const shouldRotate = isActive && activeEntries.length > 0 && encounter.currentTurnIdx > 0;
+  const currentTurnEntry = isActive ? activeEntries[encounter.currentTurnIdx] : null;
+  const currentTurnAllIdx = currentTurnEntry
+    ? allInLineEntries.indexOf(currentTurnEntry)
+    : -1;
+  const shouldRotate = isActive && currentTurnAllIdx > 0;
   const rotatedEntries = shouldRotate
     ? [
-        ...activeEntries.slice(encounter.currentTurnIdx),
-        ...activeEntries.slice(0, encounter.currentTurnIdx),
+        ...allInLineEntries.slice(currentTurnAllIdx),
+        ...allInLineEntries.slice(0, currentTurnAllIdx),
       ]
-    : activeEntries;
+    : allInLineEntries;
 
   // When hideCurrentTurn is set, skip the current entry (shown in banner instead)
   const displayEntries = hideCurrentTurn && isActive
-    ? rotatedEntries.filter((_, idx) => !(shouldRotate ? idx === 0 : idx === encounter.currentTurnIdx))
+    ? rotatedEntries.filter((e) => e !== currentTurnEntry)
     : rotatedEntries;
 
   return (
@@ -83,21 +98,26 @@ export function InitiativeList({
         </p>
       ) : (
         <div className="space-y-1">
-          {displayEntries.map((entry, idx) => {
+          {(() => {
+            let activeSeenCount = 0;
+            return displayEntries.map((entry) => {
+            const isEntryDead = !entry.isActive;
+
             // Always use original index for current turn detection
             const originalIdx = activeEntries.indexOf(entry);
             const isCurrent =
               isActive && originalIdx === encounter.currentTurnIdx;
 
-            // Position label (both views)
+            // Position label only for active entries
             let positionLabel: string | null = null;
-            if (isActive) {
-              if (idx === 0) positionLabel = "NOW";
-              else if (idx === 1) positionLabel = "ON DECK";
+            if (isActive && !isEntryDead) {
+              if (activeSeenCount === 0) positionLabel = "NOW";
+              else if (activeSeenCount === 1) positionLabel = "ON DECK";
+              activeSeenCount++;
             }
 
             // Drag-reorder needs original sorted index for server
-            const dragIdx = originalIdx;
+            const dragIdx = allInLineEntries.indexOf(entry);
 
             // Resolve owner name for companions
             const ownerName = entry.combatant.type === "COMPANION" && entry.combatant.ownerId
@@ -109,6 +129,7 @@ export function InitiativeList({
                 key={entry.id}
                 entry={entry}
                 isCurrent={isCurrent}
+                isDead={isEntryDead}
                 isDM={isDM}
                 joinCode={joinCode}
                 encounterId={encounter.id}
@@ -119,7 +140,7 @@ export function InitiativeList({
                 physicalDice={physicalDice}
                 showMonsterHpBar={showMonsterHpBar}
                 ownerName={ownerName}
-                draggable={canDrag}
+                draggable={canDrag && !isEntryDead}
                 isDragOver={dragOverIdx === dragIdx}
                 positionLabel={positionLabel}
                 onDragStart={() => setDraggedId(entry.id)}
@@ -145,18 +166,19 @@ export function InitiativeList({
                 }}
               />
             );
-          })}
+          });
+          })()}
         </div>
       )}
 
-      {/* Dead combatants */}
-      {deadEntries.length > 0 && (
+      {/* Dead monsters */}
+      {deadMonsterEntries.length > 0 && (
         <div className="space-y-1 pt-2 border-t border-dashed border-accent-red/30">
           <p className="text-accent-red/60 text-xs uppercase tracking-wider flex items-center gap-1.5">
             <Skull size={12} />
             Fallen
           </p>
-          {deadEntries.map((entry) => (
+          {deadMonsterEntries.map((entry) => (
             <div
               key={entry.id}
               className="card combatant-dead py-2 px-3 flex items-center justify-between transition-all duration-300"
@@ -196,6 +218,7 @@ export function InitiativeList({
 function InitiativeCard({
   entry,
   isCurrent,
+  isDead,
   isDM,
   joinCode,
   encounterId,
@@ -216,6 +239,7 @@ function InitiativeCard({
 }: {
   entry: EncounterWithCombatants["combatants"][number];
   isCurrent: boolean;
+  isDead?: boolean;
   isDM: boolean;
   joinCode: string;
   encounterId: string;
@@ -290,7 +314,7 @@ function InitiativeCard({
       }}
       className={`card py-2 px-3 transition-all duration-300 ${
         isCurrent ? "current-turn" : ""
-      } ${isDragOver ? "ring-2 ring-accent-gold" : ""} ${
+      } ${isDead ? "combatant-dead" : ""} ${isDragOver ? "ring-2 ring-accent-gold" : ""} ${
         draggable ? "cursor-grab select-none" : ""
       }`}
     >
@@ -309,6 +333,9 @@ function InitiativeCard({
               <span className={`text-[10px] ${typeColor}`}>
                 {getTypeLabel(entry.combatant.type)}
               </span>
+              {isDead && (
+                <Skull size={14} className="text-accent-red" />
+              )}
               <span
                 className={`text-sm font-medium ${
                   isCurrent ? "text-accent-gold" : entry.combatant.type === "MONSTER" ? "text-accent-red" : ""
@@ -395,10 +422,10 @@ function InitiativeCard({
                   instanceId: entry.id,
                 })
               }
-              className="btn btn-ghost btn-sm text-xs text-accent-red"
-              title="Kill / KO"
+              className={`btn btn-ghost btn-sm text-xs ${isDead ? "text-accent-green" : "text-accent-red"}`}
+              title={isDead ? "Revive" : "Kill / KO"}
             >
-              <Skull size={14} />
+              {isDead ? <HeartPulse size={14} /> : <Skull size={14} />}
             </button>
           )}
         </div>
