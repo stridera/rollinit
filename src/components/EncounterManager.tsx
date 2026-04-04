@@ -11,6 +11,7 @@ import {
   Swords,
   CheckCircle,
   Trash2,
+  Pencil,
 } from "lucide-react";
 import type {
   EncounterWithCombatants,
@@ -31,6 +32,20 @@ const STATUS_ICONS: Record<string, React.ComponentType<{ size?: number; classNam
   COMPLETED: CheckCircle,
 };
 
+const STATUS_COLORS: Record<string, string> = {
+  PREPARING: "text-text-muted",
+  ROLLING: "text-accent-blue",
+  ACTIVE: "text-accent-green",
+  COMPLETED: "text-text-muted",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  PREPARING: "Preparing",
+  ROLLING: "Rolling Initiative",
+  ACTIVE: "In Combat",
+  COMPLETED: "Completed",
+};
+
 export function EncounterManager({
   encounters,
   activeEncounterId,
@@ -49,20 +64,25 @@ export function EncounterManager({
   onSelectEncounter?: (id: string | null) => void;
 }) {
   const [creating, setCreating] = useState(false);
-  const [newName, setNewName] = useState("");
+  const [newName, setNewName] = useState<string | null>(null);
   const [monsterVisible, setMonsterVisible] = useState<Record<string, number>>({});
   const [monsterHidden, setMonsterHidden] = useState<Record<string, number>>({});
   const [excludedPcIds, setExcludedPcIds] = useState<Set<string>>(new Set());
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
 
   const monsters = combatants.filter((c) => c.type === "MONSTER");
   const pcsAndNpcs = combatants.filter(
     (c) => c.type === "PLAYER_CHARACTER" || c.type === "NPC" || c.type === "COMPANION"
   );
 
+  const defaultName = `Encounter ${encounters.length + 1}`;
+  const effectiveName = (newName ?? defaultName).trim();
+
   function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    if (!newName.trim()) return;
+    if (!effectiveName) return;
 
     const monstersPayload: MonsterEntry[] = [];
 
@@ -79,12 +99,12 @@ export function EncounterManager({
 
     emit("encounter:create", {
       joinCode,
-      name: newName.trim(),
+      name: effectiveName,
       monsters: monstersPayload,
       excludePcIds: Array.from(excludedPcIds),
     });
 
-    setNewName("");
+    setNewName(null);
     setMonsterVisible({});
     setMonsterHidden({});
     setExcludedPcIds(new Set());
@@ -118,19 +138,6 @@ export function EncounterManager({
   const totalVisible = Object.values(monsterVisible).reduce((s, n) => s + n, 0);
   const totalHidden = Object.values(monsterHidden).reduce((s, n) => s + n, 0);
 
-  const statusColors: Record<string, string> = {
-    PREPARING: "text-text-muted",
-    ROLLING: "text-accent-blue",
-    ACTIVE: "text-accent-green",
-    COMPLETED: "text-text-muted",
-  };
-
-  const statusLabels: Record<string, string> = {
-    PREPARING: "Preparing",
-    ROLLING: "Rolling Initiative",
-    ACTIVE: "In Combat",
-    COMPLETED: "Completed",
-  };
 
   return (
     <div className="card space-y-3">
@@ -148,8 +155,8 @@ export function EncounterManager({
         <form onSubmit={handleCreate} className="space-y-3 animate-fade-in">
           <input
             type="text"
-            placeholder="Encounter name"
-            value={newName}
+            placeholder={defaultName}
+            value={newName ?? ""}
             onChange={(e) => setNewName(e.target.value)}
             className="w-full text-sm"
             autoFocus
@@ -267,11 +274,30 @@ export function EncounterManager({
             const isSelected = enc.id === (selectedEncounterId ?? activeEncounterId);
             const StatusIcon = STATUS_ICONS[enc.status] ?? Clock;
             const isConfirmingDelete = confirmDeleteId === enc.id;
-            const canDelete = enc.status === "COMPLETED" || enc.status === "PREPARING";
+            const isEditing = editingId === enc.id;
+
+            function startEditing(e: React.MouseEvent) {
+              e.stopPropagation();
+              setEditingId(enc.id);
+              setEditName(enc.name);
+            }
+
+            function commitRename() {
+              const trimmed = editName.trim();
+              if (trimmed && trimmed !== enc.name) {
+                emit("encounter:rename", {
+                  joinCode,
+                  encounterId: enc.id,
+                  name: trimmed,
+                });
+              }
+              setEditingId(null);
+            }
+
             return (
               <div
                 key={enc.id}
-                className={`flex items-center gap-1 rounded-lg text-sm transition-colors ${
+                className={`flex items-center gap-1 rounded-lg text-sm transition-colors group ${
                   isSelected
                     ? "bg-bg-tertiary border border-accent-gold/30"
                     : "hover:bg-bg-tertiary"
@@ -279,27 +305,38 @@ export function EncounterManager({
               >
                 <button
                   onClick={() => {
-                    if (enc.status === "COMPLETED") {
-                      onSelectEncounter?.(
-                        selectedEncounterId === enc.id ? null : enc.id
-                      );
-                    } else {
-                      emit("encounter:select", {
-                        joinCode,
-                        encounterId: enc.id,
-                      });
-                      onSelectEncounter?.(null);
-                    }
+                    if (isEditing) return;
+                    emit("encounter:select", {
+                      joinCode,
+                      encounterId: enc.id,
+                    });
+                    onSelectEncounter?.(null);
                   }}
                   className="flex-1 text-left px-3 py-2 min-w-0"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-medium truncate">{enc.name}</span>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        onBlur={commitRename}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") commitRename();
+                          if (e.key === "Escape") setEditingId(null);
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="font-medium text-sm bg-bg-secondary border border-accent-gold/40 rounded px-1.5 py-0.5 w-full mr-2 outline-none focus:border-accent-gold"
+                        autoFocus
+                      />
+                    ) : (
+                      <span className="font-medium truncate">{enc.name}</span>
+                    )}
                     <span
-                      className={`text-xs flex items-center gap-1 shrink-0 ${statusColors[enc.status]}`}
+                      className={`text-xs flex items-center gap-1 shrink-0 ${STATUS_COLORS[enc.status]}`}
                     >
                       <StatusIcon size={12} />
-                      {statusLabels[enc.status]}
+                      {STATUS_LABELS[enc.status]}
                     </span>
                   </div>
                   {enc.status === "ACTIVE" && (
@@ -310,29 +347,38 @@ export function EncounterManager({
                     </p>
                   )}
                 </button>
-                {canDelete && (
-                  <button
-                    onClick={() => {
-                      if (isConfirmingDelete) {
-                        emit("encounter:delete", { joinCode, encounterId: enc.id });
-                        setConfirmDeleteId(null);
-                        if (selectedEncounterId === enc.id) {
-                          onSelectEncounter?.(null);
+                {!isEditing && (
+                  <>
+                    <button
+                      onClick={startEditing}
+                      className="p-2 rounded shrink-0 text-text-muted opacity-0 group-hover:opacity-100 hover:text-accent-gold transition-all"
+                      title="Rename encounter"
+                    >
+                      <Pencil size={12} />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (isConfirmingDelete) {
+                          emit("encounter:delete", { joinCode, encounterId: enc.id });
+                          setConfirmDeleteId(null);
+                          if (selectedEncounterId === enc.id) {
+                            onSelectEncounter?.(null);
+                          }
+                        } else {
+                          setConfirmDeleteId(enc.id);
+                          setTimeout(() => setConfirmDeleteId(null), 3000);
                         }
-                      } else {
-                        setConfirmDeleteId(enc.id);
-                        setTimeout(() => setConfirmDeleteId(null), 3000);
-                      }
-                    }}
-                    className={`p-2 rounded shrink-0 transition-colors ${
-                      isConfirmingDelete
-                        ? "text-accent-red bg-accent-red/10"
-                        : "text-text-muted hover:text-accent-red"
-                    }`}
-                    title={isConfirmingDelete ? "Click again to confirm delete" : "Delete encounter"}
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                      }}
+                      className={`p-2 rounded shrink-0 transition-all ${
+                        isConfirmingDelete
+                          ? "text-accent-red bg-accent-red/10 opacity-100"
+                          : "text-text-muted opacity-0 group-hover:opacity-100 hover:text-accent-red"
+                      }`}
+                      title={isConfirmingDelete ? "Click again to confirm delete" : "Delete encounter"}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </>
                 )}
               </div>
             );
