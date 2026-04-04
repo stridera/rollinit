@@ -437,6 +437,7 @@ export function PlayerView({ joinCode }: { joinCode: string }) {
             <h1 className="text-xl">RollInit</h1>
             <p className="text-text-muted text-xs">
               {combatantId ? playerName : "Spectator"} &middot; {joinCode}
+              {activeEncounter && <> &middot; {activeEncounter.name}</>}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -656,7 +657,7 @@ export function PlayerView({ joinCode }: { joinCode: string }) {
           </div>
         )}
 
-        {/* Dice Roller + Log -- only for registered players */}
+        {/* Dice Roller -- only for registered players */}
         {combatantId && (
           <DiceRoller
             joinCode={joinCode}

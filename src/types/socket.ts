@@ -131,6 +131,12 @@ export type DeleteEncounterPayload = {
   encounterId: string;
 };
 
+export type RenameEncounterPayload = {
+  joinCode: string;
+  encounterId: string;
+  name: string;
+};
+
 export type ReorderPayload = {
   joinCode: string;
   encounterId: string;
@@ -237,6 +243,7 @@ export interface ClientToServerEvents {
   "combat:toggleActive": (data: ToggleActivePayload) => void;
   "combat:end": (data: EndCombatPayload) => void;
   "encounter:delete": (data: DeleteEncounterPayload) => void;
+  "encounter:rename": (data: RenameEncounterPayload) => void;
   "combat:reorder": (data: ReorderPayload) => void;
   "instance:update": (data: UpdateInstancePayload) => void;
   "encounter:addCombatant": (data: AddToCombatPayload) => void;

@@ -47,10 +47,12 @@ async function getSessionState(joinCode: string): Promise<SessionState | null> {
 
   if (!session) return null;
 
-  // Find the active encounter (most recent non-COMPLETED)
-  const activeEncounter = [...session.encounters]
-    .reverse()
-    .find((e) => e.status !== "COMPLETED");
+  // Use stored selection, falling back to most recent non-COMPLETED
+  const activeEncounterId =
+    session.activeEncounterId &&
+    session.encounters.some((e) => e.id === session.activeEncounterId)
+      ? session.activeEncounterId
+      : [...session.encounters].reverse().find((e) => e.status !== "COMPLETED")?.id ?? null;
 
   return {
     joinCode: session.joinCode,
@@ -60,7 +62,7 @@ async function getSessionState(joinCode: string): Promise<SessionState | null> {
     showMonsterHpBar: session.showMonsterHpBar,
     combatants: session.combatants,
     encounters: session.encounters,
-    activeEncounterId: activeEncounter?.id ?? null,
+    activeEncounterId,
     diceRolls: session.diceRolls,
   };
 }
@@ -504,10 +506,21 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
       },
     });
 
+    // Auto-select the newly created encounter
+    await prisma.session.update({
+      where: { id: session.id },
+      data: { activeEncounterId: encounter.id },
+    });
+
     emitEncounterUpdate(io, data.joinCode, encounter, "encounter:created");
   });
 
   socket.on("encounter:select", async (data) => {
+    await prisma.session.update({
+      where: { joinCode: data.joinCode },
+      data: { activeEncounterId: data.encounterId },
+    });
+
     const state = await getSessionState(data.joinCode);
     if (!state) return;
 
@@ -914,16 +927,23 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
   });
 
   socket.on("combat:end", async (data) => {
-    const encounter = await prisma.encounter.update({
-      where: { id: data.encounterId },
-      data: { status: "COMPLETED" },
-      include: {
-        combatants: {
-          include: { combatant: true },
-          orderBy: { sortOrder: "asc" },
+    const [encounter] = await Promise.all([
+      prisma.encounter.update({
+        where: { id: data.encounterId },
+        data: { status: "COMPLETED" },
+        include: {
+          combatants: {
+            include: { combatant: true },
+            orderBy: { sortOrder: "asc" },
+          },
         },
-      },
-    });
+      }),
+      // Clear stored selection so it falls back to next non-completed
+      prisma.session.update({
+        where: { joinCode: data.joinCode },
+        data: { activeEncounterId: null },
+      }),
+    ]);
 
     emitEncounterUpdate(io, data.joinCode, encounter, "combat:ended");
   });
@@ -931,6 +951,12 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
   // --- Delete Encounter ---
   socket.on("encounter:delete", async (data) => {
     try {
+      // Clear stored selection if deleting the active encounter
+      await prisma.session.updateMany({
+        where: { joinCode: data.joinCode, activeEncounterId: data.encounterId },
+        data: { activeEncounterId: null },
+      });
+
       await prisma.encounter.delete({
         where: { id: data.encounterId },
       });
@@ -940,6 +966,24 @@ export function registerSocketHandlers(io: IO, socket: SocketInstance) {
     } catch (err) {
       console.error("[encounter:delete] Failed:", err);
       socket.emit("error", "Failed to delete encounter");
+    }
+  });
+
+  // --- Rename Encounter ---
+  socket.on("encounter:rename", async (data) => {
+    try {
+      const encounter = await prisma.encounter.update({
+        where: { id: data.encounterId },
+        data: { name: data.name },
+        include: {
+          combatants: { include: { combatant: true }, orderBy: { sortOrder: "asc" } },
+        },
+      });
+
+      emitEncounterUpdate(io, data.joinCode, encounter, "encounter:updated");
+    } catch (err) {
+      console.error("[encounter:rename] Failed:", err);
+      socket.emit("error", "Failed to rename encounter");
     }
   });
 
