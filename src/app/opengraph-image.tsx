@@ -82,6 +82,7 @@ export default async function OpenGraphImage() {
 
         {/* D20 die */}
         <img
+          alt=""
           src={d20DataUri}
           width={160}
           height={160}

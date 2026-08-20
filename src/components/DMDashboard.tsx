@@ -11,7 +11,6 @@ import {
   Swords,
   Dice6,
   Github,
-  Eye,
   Settings,
   Maximize2,
   Minimize2,
