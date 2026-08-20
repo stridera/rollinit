@@ -1,280 +1,188 @@
-"use client";
+import {
+  Swords,
+  Heart,
+  Dices,
+  BookOpen,
+  Globe,
+  Github,
+  Crown,
+  Share2,
+  Play,
+} from "lucide-react";
+import { HomeHero } from "@/components/HomeHero";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Crown, LogIn, Github, ArrowLeft, KeyRound } from "lucide-react";
-import { D20Icon } from "@/components/D20Icon";
+const FEATURES = [
+  {
+    icon: Swords,
+    title: "Real-Time Initiative Tracking",
+    body: "Roll initiative with advantage support, drag to reorder, and advance turns and rounds. The turn order syncs live to every player's phone, tablet, or laptop the moment it changes.",
+  },
+  {
+    icon: Heart,
+    title: "Full Combat Management",
+    body: "Track HP, temporary HP, armor class, and conditions for every combatant. Dying characters stay in the order for death saves, and monsters can be hidden from players until they strike.",
+  },
+  {
+    icon: Dices,
+    title: "Built-In Dice Roller",
+    body: "Roll d4 through d100 with modifiers, shared with the table or kept private as the DM. Prefer real dice at the table? Physical dice mode lets you type in the results instead.",
+  },
+  {
+    icon: BookOpen,
+    title: "Prep Encounters in Advance",
+    body: "Build multiple encounters before game night — the ambush, the boss fight, the escape — and switch between them mid-session without re-entering a single monster.",
+  },
+  {
+    icon: Globe,
+    title: "No Accounts, No Installs",
+    body: "Nothing to download and no sign-up for you or your players. Create a session, share a six-character join code, and everyone is in from any web browser.",
+  },
+  {
+    icon: Github,
+    title: "Free and Open Source",
+    body: "RollInit is completely free with no ads, no premium tier, and no locked features. The source code is on GitHub — bug reports and contributions are welcome.",
+  },
+];
+
+const STEPS = [
+  {
+    icon: Crown,
+    title: "Create a session",
+    body: "One click as the Dungeon Master — no account needed. Bookmark your private DM link to return to the same session later.",
+  },
+  {
+    icon: Share2,
+    title: "Share the join code",
+    body: "Players enter the six-character code on any device and see the live player view. Add an optional password to keep strangers out.",
+  },
+  {
+    icon: Play,
+    title: "Run the combat",
+    body: "Roll initiative, track HP and conditions, and advance turns. Everyone sees the current turn and dice rolls update in real time.",
+  },
+];
+
+const FAQ = [
+  {
+    q: "Is RollInit really free?",
+    a: "Yes. RollInit is a completely free, open-source initiative tracker and dice roller. There are no ads, no paid tiers, and no features behind a sign-up wall.",
+  },
+  {
+    q: "Do my players need to create accounts or install anything?",
+    a: "No. RollInit runs entirely in the browser. Players join with a six-character code, and the DM gets a private link — no accounts, downloads, or installs for anyone.",
+  },
+  {
+    q: "What game systems does RollInit work with?",
+    a: "RollInit is built with D&D 5e in mind, but it works for any game with rolled initiative and hit points — Pathfinder, older D&D editions, and most d20-style RPGs.",
+  },
+  {
+    q: "Can players see monster HP and hidden enemies?",
+    a: "Only if you want them to. The DM can hide monsters from the player view entirely and choose whether players see monster health bars.",
+  },
+  {
+    q: "We roll physical dice at the table — can we still use it?",
+    a: "Yes. Turn on physical dice mode and enter the rolls you make at the table, while RollInit handles the turn order, HP, and conditions on screen.",
+  },
+  {
+    q: "How do I get back to my game later?",
+    a: "Bookmark the private DM link created with your session. Sessions persist, so you can prep encounters during the week and pick up where you left off on game night.",
+  },
+];
+
+const JSON_LD = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebApplication",
+      name: "RollInit",
+      url: "https://rollinit.app",
+      description:
+        "Free online D&D initiative tracker and dice roller. Track combat turn order, HP, and conditions in real time with your players — no accounts or installs required.",
+      applicationCategory: "GameApplication",
+      operatingSystem: "Web",
+      isAccessibleForFree: true,
+      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    },
+    {
+      "@type": "FAQPage",
+      mainEntity: FAQ.map((item) => ({
+        "@type": "Question",
+        name: item.q,
+        acceptedAnswer: { "@type": "Answer", text: item.a },
+      })),
+    },
+  ],
+};
 
 export default function Home() {
-  const router = useRouter();
-  const [joinCode, setJoinCode] = useState("");
-  const [creating, setCreating] = useState(false);
-  const [joining, setJoining] = useState(false);
-  const [joinError, setJoinError] = useState("");
-  const [needsPassword, setNeedsPassword] = useState(false);
-  const [passwordInput, setPasswordInput] = useState("");
-  const [passwordError, setPasswordError] = useState("");
-  const [pendingJoinCode, setPendingJoinCode] = useState("");
-
-  async function handleCreate() {
-    setCreating(true);
-    try {
-      const res = await fetch("/api/sessions", { method: "POST" });
-      const data = await res.json();
-      if (data.dmToken) {
-        router.push(`/dm/${data.dmToken}`);
-      }
-    } catch {
-      setCreating(false);
-    }
-  }
-
-  async function handleJoin(e: React.FormEvent) {
-    e.preventDefault();
-    const code = joinCode.trim().toUpperCase();
-    if (!code) return;
-    setJoining(true);
-    setJoinError("");
-
-    try {
-      const res = await fetch(`/api/sessions/${code}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.hasPassword) {
-          setPendingJoinCode(data.joinCode);
-          setNeedsPassword(true);
-          setJoining(false);
-        } else {
-          router.push(`/session/${data.joinCode}`);
-        }
-      } else {
-        setJoinError("Session not found. Check your code and try again.");
-        setJoining(false);
-      }
-    } catch {
-      setJoinError("Connection error. Please try again.");
-      setJoining(false);
-    }
-  }
-
-  async function handlePasswordSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!passwordInput) return;
-    setPasswordError("");
-    setJoining(true);
-
-    try {
-      const res = await fetch(`/api/sessions/${pendingJoinCode}/validate-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: passwordInput }),
-      });
-      if (res.ok) {
-        router.push(`/session/${pendingJoinCode}`);
-      } else {
-        setPasswordError("Incorrect password. Try again.");
-        setJoining(false);
-      }
-    } catch {
-      setPasswordError("Connection error. Please try again.");
-      setJoining(false);
-    }
-  }
-
-  function handleBackFromPassword() {
-    setNeedsPassword(false);
-    setPasswordInput("");
-    setPasswordError("");
-    setPendingJoinCode("");
-  }
-
   return (
-    <div className="min-h-dvh flex items-center justify-center p-4 relative z-10">
-      {/* Viewport vignette */}
-      <div
-        className="fixed inset-0 pointer-events-none z-0"
-        style={{
-          background:
-            "radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.5) 100%)",
-        }}
-      />
+    <>
+      <HomeHero />
 
-      <div className="w-full max-w-md space-y-8 relative">
-        {/* Floating particles */}
-        <div className="particle particle-1" />
-        <div className="particle particle-2" />
-        <div className="particle particle-3" />
-        <div className="particle particle-4" />
+      <div className="relative z-10 max-w-4xl mx-auto px-4 pb-16 space-y-16">
+        {/* Intro */}
+        <section className="text-center space-y-3 max-w-2xl mx-auto">
+          <h2 className="text-3xl">A Free Online Initiative Tracker for D&D</h2>
+          <p className="text-text-secondary">
+            RollInit is a free combat tracker and dice roller for Dungeons &
+            Dragons 5e and other tabletop RPGs. Run initiative order, hit
+            points, and conditions from one screen while your players follow
+            along live on their own devices — at the table or over a video
+            call.
+          </p>
+        </section>
 
-        {/* Logo / Title */}
-        <div className="text-center space-y-3">
-          <div className="flex justify-center">
-            <D20Icon
-              size={80}
-              className="text-accent-gold drop-shadow-[0_0_20px_rgba(212,168,67,0.3)] hover:rotate-12 transition-transform duration-700"
-            />
+        {/* Features */}
+        <section className="space-y-6">
+          <h2 className="text-2xl text-center">Everything You Need to Run Combat</h2>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {FEATURES.map((f) => (
+              <div key={f.title} className="card space-y-2">
+                <f.icon size={22} className="text-accent-gold" aria-hidden />
+                <h3 className="text-lg" style={{ fontFamily: "var(--font-body)" }}>{f.title}</h3>
+                <p className="text-text-secondary text-sm">{f.body}</p>
+              </div>
+            ))}
           </div>
-          <h1 className="text-5xl tracking-wide">RollInit</h1>
-          <p className="text-text-secondary text-sm tracking-widest uppercase">
-            Initiative Tracker & Dice Roller
-          </p>
-        </div>
+        </section>
 
-        {/* Create Session */}
-        <div className="card space-y-4 border-t-2 border-t-accent-gold/40 shadow-[inset_0_1px_12px_rgba(212,168,67,0.04)]">
-          <h2 className="text-xl">Dungeon Master</h2>
-          <p className="text-text-secondary text-sm">
-            Create a new session and invite your players with a join code.
-          </p>
-          <button
-            onClick={handleCreate}
-            disabled={creating}
-            className="btn btn-primary w-full text-lg"
-          >
-            {creating ? (
-              <span className="flex items-center gap-2">
-                <Spinner /> Creating...
-              </span>
-            ) : (
-              <span className="flex items-center justify-center gap-2">
-                <Crown size={20} /> Create Session
-              </span>
-            )}
-          </button>
-        </div>
+        {/* How it works */}
+        <section className="space-y-6">
+          <h2 className="text-2xl text-center">How It Works</h2>
+          <div className="grid sm:grid-cols-3 gap-4">
+            {STEPS.map((s, i) => (
+              <div key={s.title} className="card space-y-2 text-center">
+                <div className="flex items-center justify-center gap-2 text-accent-gold">
+                  <span className="text-sm font-semibold">{i + 1}.</span>
+                  <s.icon size={20} aria-hidden />
+                </div>
+                <h3 className="text-lg" style={{ fontFamily: "var(--font-body)" }}>{s.title}</h3>
+                <p className="text-text-secondary text-sm">{s.body}</p>
+              </div>
+            ))}
+          </div>
+        </section>
 
-        {/* Ornamental divider */}
-        <div className="flex items-center gap-4">
-          <div className="flex-1 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
-          <span className="text-accent-gold/40 text-sm select-none">{"\u25C6"}</span>
-          <div className="flex-1 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
-        </div>
-
-        {/* Join Session */}
-        <div className="card space-y-4 border-t-2 border-t-accent-gold/40 shadow-[inset_0_1px_12px_rgba(212,168,67,0.04)]">
-          {needsPassword ? (
-            <>
-              <h2 className="text-xl">Enter Password</h2>
-              <p className="text-text-secondary text-sm">
-                This session requires a password to join.
-              </p>
-              <form onSubmit={handlePasswordSubmit} className="space-y-3">
-                <input
-                  type="password"
-                  placeholder="Session password"
-                  value={passwordInput}
-                  onChange={(e) => setPasswordInput(e.target.value)}
-                  className="w-full text-center"
-                  autoFocus
-                />
-                {passwordError && (
-                  <p className="text-accent-red text-sm text-center">{passwordError}</p>
-                )}
-                <button
-                  type="submit"
-                  disabled={joining || !passwordInput}
-                  className="btn btn-secondary w-full"
-                >
-                  {joining ? (
-                    <span className="flex items-center gap-2">
-                      <Spinner /> Verifying...
-                    </span>
-                  ) : (
-                    <span className="flex items-center justify-center gap-2">
-                      <KeyRound size={18} /> Submit
-                    </span>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleBackFromPassword}
-                  className="btn btn-ghost w-full text-sm"
-                >
-                  <span className="flex items-center justify-center gap-2">
-                    <ArrowLeft size={16} /> Back
-                  </span>
-                </button>
-              </form>
-            </>
-          ) : (
-            <>
-              <h2 className="text-xl">Player</h2>
-              <p className="text-text-secondary text-sm">
-                Enter the code your DM shared to join the session.
-              </p>
-              <form onSubmit={handleJoin} className="space-y-3">
-                <input
-                  type="text"
-                  placeholder="Enter join code"
-                  value={joinCode}
-                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                  maxLength={6}
-                  className="w-full text-center text-2xl tracking-[0.3em] uppercase"
-                  style={{ fontFamily: "var(--font-heading)" }}
-                />
-                {joinError && (
-                  <p className="text-accent-red text-sm text-center">{joinError}</p>
-                )}
-                <button
-                  type="submit"
-                  disabled={joining || joinCode.trim().length === 0}
-                  className="btn btn-secondary w-full"
-                >
-                  {joining ? (
-                    <span className="flex items-center gap-2">
-                      <Spinner /> Joining...
-                    </span>
-                  ) : (
-                    <span className="flex items-center justify-center gap-2">
-                      <LogIn size={18} /> Join Session
-                    </span>
-                  )}
-                </button>
-              </form>
-            </>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="text-center space-y-1">
-          <p className="text-text-muted text-xs">
-            No account needed. Bookmark your DM link to return later.
-          </p>
-          <a
-            href="https://github.com/stridera/rollinit/issues"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-text-muted text-xs hover:text-text-secondary transition-colors"
-          >
-            <Github size={12} />
-            Found a bug? Open an issue
-          </a>
-        </div>
+        {/* FAQ */}
+        <section className="space-y-6 max-w-2xl mx-auto">
+          <h2 className="text-2xl text-center">Frequently Asked Questions</h2>
+          <div className="space-y-4">
+            {FAQ.map((item) => (
+              <div key={item.q} className="card space-y-1">
+                <h3 className="text-base font-semibold text-text-primary" style={{ fontFamily: "var(--font-body)" }}>
+                  {item.q}
+                </h3>
+                <p className="text-text-secondary text-sm">{item.a}</p>
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
-    </div>
-  );
-}
 
-function Spinner() {
-  return (
-    <svg
-      className="animate-spin h-4 w-4"
-      viewBox="0 0 24 24"
-      fill="none"
-    >
-      <circle
-        className="opacity-25"
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeWidth="4"
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }}
       />
-      <path
-        className="opacity-75"
-        fill="currentColor"
-        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-      />
-    </svg>
+    </>
   );
 }
